@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#F5A800"/>
+  <g transform="translate(256 290) scale(1.22) translate(-200 -232)">
+  <!-- sombra -->
+  
+  <!-- corpo (ovo) -->
+  <path d="M200 92 C268 92 312 196 312 262 C312 330 262 372 200 372 C138 372 88 330 88 262 C88 196 132 92 200 92 Z" fill="#FFF9EC" stroke="#3d2614" stroke-width="9"/>
+  <path d="M286 230 C292 300 258 352 200 356 C258 340 286 300 286 230 Z" fill="#F3E3C3"/>
+  <ellipse cx="146" cy="190" rx="12" ry="30" transform="rotate(20 146 190)" fill="#fff"/>
+  <!-- boné de entregador -->
+  <path d="M128 150 C130 96 168 74 204 74 C244 74 276 100 278 150 Z" fill="#F5A800" stroke="#3d2614" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M232 148 C262 144 300 146 318 156 C306 168 270 166 236 162 Z" fill="#3d2614"/>
+  <path d="M128 150 C170 140 236 140 278 150" fill="none" stroke="#3d2614" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="203" cy="76" r="9" fill="#3d2614"/>
+  <circle cx="196" cy="114" r="18" fill="#FFF9EC" stroke="#3d2614" stroke-width="5"/>
+  <text x="196" y="122" text-anchor="middle" font-family="Arial Black, Arial" font-weight="900" font-size="22" fill="#3d2614">E</text>
+  <!-- olhos -->
+  <ellipse cx="176" cy="218" rx="13" ry="25" fill="#3d2614"/>
+        <path d="M176 218 L178 196 A13 25 0 0 1 188 210 Z" fill="#fff"/><ellipse cx="226" cy="218" rx="13" ry="25" fill="#3d2614"/>
+        <path d="M226 218 L228 196 A13 25 0 0 1 238 210 Z" fill="#fff"/>
+  <!-- bochechas -->
+  <ellipse cx="144" cy="262" rx="15" ry="9" fill="#F7A07A" opacity=".8"/>
+  <ellipse cx="258" cy="262" rx="15" ry="9" fill="#F7A07A" opacity=".8"/>
+  <!-- boca -->
+  <path d="M160 258 C172 300 230 300 242 258 Z" fill="#3d2614" stroke="#3d2614" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M176 284 C188 272 214 272 226 284 C214 294 188 294 176 284 Z" fill="#E8432F"/>
+  <path d="M166 261 L236 261 L233 270 L169 270 Z" fill="#fff"/>
+  <path d="M154 254 q-6 4 -4 12 M248 254 q6 4 4 12" fill="none" stroke="#3d2614" stroke-width="6" stroke-linecap="round"/>
+</g>
+</svg>

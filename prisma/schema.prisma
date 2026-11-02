@@ -1,0 +1,238 @@
+// Banco do EGGS by Santimelo: app de pedidos de ovos + painel da equipe.
+// Local: SQLite (prisma/dev.db). Produção: trocar provider para "postgresql" e DATABASE_URL.
+// Campos "tipo/status/papel" são String com valores definidos em src/lib/constantes.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id           String    @id @default(cuid())
+  nome         String
+  email        String    @unique
+  senhaHash    String
+  papel        String // DIRETOR | CLIENTE
+  ativo        Boolean   @default(true)
+  criadoEm     DateTime  @default(now())
+  clienteId    String?   @unique // papel CLIENTE: o cliente do app que esse login representa
+  codigoAcesso String?   @unique // o cliente entra com código (ex: EGG-7K3P) + senha
+  falhas       Int       @default(0) // senhas erradas seguidas; 5 bloqueia por 15 min
+  bloqueadoAte DateTime?
+  ultimoAcesso DateTime?
+  cliente      Cliente?  @relation(fields: [clienteId], references: [id])
+}
+
+// Tipo de ovo (ex: Ovo branco). O estoque é contado em caixas de 360 ovos.
+model Item {
+  id             String             @id @default(cuid())
+  codigo         String?            @unique // "1", "2"... fixo: não muda quando entra tipo novo
+  nome           String             @unique
+  unidadeEstoque String             @default("caixa")
+  ativo          Boolean            @default(true)
+  ordem          Int                @default(0)
+  produtos       Produto[]
+  movimentos     MovimentoEstoque[]
+}
+
+// O que o cliente compra. Ex: Ovo branco · Caixa (12 bandejas de 30)
+model Produto {
+  id              String           @id @default(cuid())
+  codigo          String?          @unique
+  itemId          String
+  item            Item             @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  embalagem       String // "Caixa (12 bandejas de 30)", "Bandeja 30 un"...
+  unidade         String // caixa | bandeja
+  fatorEstoque    Float? // quanto do estoque do item 1 unidade vendida consome (bandeja 30 ovos = 1/12 caixa); nulo = não controla
+  preco           Float
+  ativo           Boolean          @default(true)
+  pedidoItens     PedidoItem[]
+  precos          HistoricoPreco[]
+  precosCliente   PrecoCliente[]
+  precosAgendados PrecoAgendado[]
+}
+
+// Cada preço de venda que o produto já teve (base do gráfico de custo × venda)
+model HistoricoPreco {
+  id        String   @id @default(cuid())
+  produtoId String
+  produto   Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  preco     Float
+  em        DateTime @default(now())
+  origem    String // INICIAL | PAINEL | AGENDADO
+  autor     String?
+
+  @@index([produtoId, em])
+}
+
+// Cliente do app (padaria, confeitaria, restaurante...). A Santimelo cadastra; não existe cadastro aberto
+model Cliente {
+  id                 String         @id @default(cuid())
+  razaoSocial        String
+  nomeFantasia       String
+  cnpj               String?
+  tipoNegocio        String
+  endereco           String?
+  cep                String?
+  responsavel        String?
+  email              String?
+  whatsapp           String?
+  formaPagamento     String?
+  observacoes        String?
+  ativo              Boolean        @default(true)
+  criadoEm           DateTime       @default(now())
+  consumoSemanal     Float? // caixas de ovos por semana (estimativa combinada)
+  limiteCredito      Float? // quanto pode ficar em aberto, em R$
+  prazoPagamentoDias Int? // dias depois da entrega pra pagar
+  negociacao         String? // o que foi combinado, aparece pro cliente no app
+  regiaoId           String?
+  regiao             Regiao?        @relation(fields: [regiaoId], references: [id])
+  usuario            Usuario?
+  pedidos            Pedido[]
+  precosEspeciais    PrecoCliente[]
+  cobrancas          Cobranca[]
+  mensagens          Mensagem[]
+}
+
+// Região de entrega (ex: Zona Norte) com os dias e horários em que o caminhão passa
+model Regiao {
+  id       String          @id @default(cuid())
+  nome     String          @unique
+  bairros  String?
+  ativo    Boolean         @default(true)
+  janelas  JanelaEntrega[]
+  clientes Cliente[]
+}
+
+// Horário de entrega numa região: dia da semana (0 = domingo) + faixa + quantos pedidos cabem
+model JanelaEntrega {
+  id         String   @id @default(cuid())
+  regiaoId   String
+  regiao     Regiao   @relation(fields: [regiaoId], references: [id], onDelete: Cascade)
+  diaSemana  Int
+  inicio     String // "07:00"
+  fim        String // "09:00"
+  capacidade Int      @default(6)
+  ativo      Boolean  @default(true)
+  pedidos    Pedido[]
+
+  @@unique([regiaoId, diaSemana, inicio])
+}
+
+// Preço negociado com um cliente (vale no lugar do preço de tabela)
+model PrecoCliente {
+  id        String  @id @default(cuid())
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  produtoId String
+  produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  preco     Float
+
+  @@unique([clienteId, produtoId])
+}
+
+// Preço futuro já decidido: o cliente vê no app com antecedência (previsibilidade) e ele entra sozinho no dia
+model PrecoAgendado {
+  id         String    @id @default(cuid())
+  produtoId  String
+  produto    Produto   @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  preco      Float
+  aPartirDe  String // "AAAA-MM-DD"
+  aplicadoEm DateTime?
+  autor      String
+  criadoEm   DateTime  @default(now())
+
+  @@index([aPartirDe])
+}
+
+// Conta a receber de um pedido: vence N dias depois da entrega (prazo combinado com o cliente)
+model Cobranca {
+  id         String    @id @default(cuid())
+  clienteId  String
+  cliente    Cliente   @relation(fields: [clienteId], references: [id])
+  pedidoId   Int?      @unique
+  pedido     Pedido?   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  valor      Float
+  vencimento String // "AAAA-MM-DD"
+  pagoEm     DateTime?
+  criadoEm   DateTime  @default(now())
+
+  @@index([vencimento])
+}
+
+// Mensagem que aparece no app do cliente. chave evita repetir o mesmo aviso automático
+model Mensagem {
+  id        String    @id @default(cuid())
+  clienteId String
+  cliente   Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tipo      String // PAGAMENTO | PEDIDO | AVISO
+  texto     String
+  chave     String?   @unique
+  autor     String
+  criadaEm  DateTime  @default(now())
+  lidaEm    DateTime?
+
+  @@index([clienteId, criadaEm])
+}
+
+model Pedido {
+  id          Int                @id @default(autoincrement())
+  clienteId   String
+  cliente     Cliente            @relation(fields: [clienteId], references: [id])
+  status      String             @default("NOVO") // NOVO | SEPARACAO | ENTREGA | ENTREGUE | CANCELADO
+  origem      String             @default("APP") // APP | PAINEL | WHATSAPP
+  dataEntrega DateTime
+  observacao  String?
+  total       Float              @default(0)
+  criadoEm    DateTime           @default(now())
+  janelaId    String? // horário de entrega escolhido no app
+  janela      JanelaEntrega?     @relation(fields: [janelaId], references: [id])
+  itens       PedidoItem[]
+  movimentos  MovimentoEstoque[]
+  cobranca    Cobranca?
+
+  @@index([dataEntrega])
+}
+
+model PedidoItem {
+  id         String  @id @default(cuid())
+  pedidoId   Int
+  pedido     Pedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  produtoId  String
+  produto    Produto @relation(fields: [produtoId], references: [id])
+  quantidade Float
+  precoUnit  Float
+  subtotal   Float
+}
+
+// Extrato do estoque, em caixas. tipo: COMPRA (+) | VENDA (−, pedido saiu pra entrega) | PERDA (−) | AJUSTE (±, contagem)
+// quantidade é sempre com sinal: entrada positiva, saída negativa
+model MovimentoEstoque {
+  id         String   @id @default(cuid())
+  data       DateTime @default(now())
+  itemId     String
+  item       Item     @relation(fields: [itemId], references: [id])
+  tipo       String
+  quantidade Float
+  custoUnit  Float? // só na compra: R$ por caixa
+  origem     String? // na compra: GRANJA | CEASA | FORNECEDOR
+  fornecedor String?
+  pedidoId   Int?
+  pedido     Pedido?  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  observacao String?
+  autor      String
+
+  @@index([data])
+  @@index([itemId, data])
+}
+
+// Configurações do sistema (chave → valor). Ex: modo manutenção do app
+model Configuracao {
+  chave    String   @id
+  valor    String
+  alterado DateTime @updatedAt
+}
