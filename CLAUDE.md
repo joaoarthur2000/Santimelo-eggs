@@ -51,6 +51,12 @@ Next.js 16 (App Router, Turbopack) + Prisma 6 + Tailwind 4. SQLite local em `pri
 
 ## Guinho (mascote)
 
-- PNGs em `public/eggs/guinho/` (poses: acenando, joinha, paz, comemorando); originais SVG em `../Logo/eggs/guinho/`. Componentes `Guinho` e `TituloEggs` em `src/app/eggs/guinho.tsx`.
-- 3D só na aba Início: `src/app/eggs/(app)/guinho-3d.tsx` carrega `guinho-cena.ts` (three.js) sob demanda; sem WebGL fica o PNG.
+- Estilo cartoon retrô (anos 30, braços de mangueira, luvas, olhos recortados), só com as cores oficiais da Santimelo (manual em `../ident.visual/`). Boné verde Folha Fresca com o símbolo da Santimelo.
+- Arte gerada por código: `../Logo/eggs/guinho/gerar-guinho.mjs` grava os SVGs ali e os PNGs (480 × 528) em `public/eggs/guinho/`. Ajustar o Guinho = editar o gerador e rodar de novo. Versão antiga em `../Logo/eggs/guinho/v1-antigo/`.
+- Componentes `Guinho`, `TituloEggs` e `POSES_GUINHO` em `src/app/eggs/guinho.tsx`. Na aba Início, `GuinhoAnimado` (`(app)/guinho-animado.tsx`): ginga parado e, a cada toque, pula e troca de pose. Só CSS (`eggs-ginga`, `eggs-pulo` em `globals.css`), sem three.js.
+
+## Ícone do app (tela do celular)
+
+- Símbolo da Santimelo (o "e" em forma de ovo) em Terra Fértil sobre Gema de Ovo: `public/eggs/icone.svg`, `icone-192.png`, `icone-512.png` (Android, maskable) e `apple-touch-icon.png` (iPhone). O símbolo ocupa 58% da altura pra caber na área segura do Android.
+- Ao trocar a arte, subir o `?v=` em `manifest.webmanifest/route.ts`, `eggs/layout.tsx` e `marca-eggs.tsx`: senão o celular mostra o ícone guardado. Quem já instalou precisa remover e adicionar de novo.
 - A faixa marrom (`Faixa` em `enfeites.tsx`) corre SEMPRE, inclusive com "reduzir movimento": pedido do dono.

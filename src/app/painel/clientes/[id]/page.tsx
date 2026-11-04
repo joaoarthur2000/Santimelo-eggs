@@ -3,20 +3,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Cabecalho, Etiqueta } from "@/components/ui";
-import { ASSINATURA_EGGS, STATUS_PEDIDO, type StatusPedido } from "@/lib/constantes";
-import { diaISO, formatarDataCurta } from "@/lib/datas";
+import { ASSINATURA_EGGS, condicaoPagamento, STATUS_PEDIDO, type StatusPedido } from "@/lib/constantes";
+import { diaISO, fimDoDia, formatarDataCurta, inicioDoDia, somarDias } from "@/lib/datas";
 import { db } from "@/lib/db";
-import { nomeProduto, reais } from "@/lib/formato";
+import { nomeProduto, num, reais } from "@/lib/formato";
+import { linkDeAcesso, qrDeAcesso } from "@/lib/acesso";
 import { linkDoApp } from "@/lib/rede";
 import { alternarAcesso, desbloquear, marcarPago, salvarPrecoEspecial } from "../../actions";
-import { BotaoNovaSenha, FormCondicoes, FormDados, FormMensagem } from "../../forms";
+import { BotaoLiberarApp, BotaoNovaSenha, FormCondicoes, FormDados, FormMensagem } from "../../forms";
 
 export const metadata: Metadata = { title: "Cliente EGGS" };
 
 export default async function ClienteEggs({ params }: PageProps<"/painel/clientes/[id]">) {
   const { id } = await params;
   const hoje = diaISO();
-  const [cliente, regioes, produtos] = await Promise.all([
+  const [cliente, regioes, produtos, vendas] = await Promise.all([
     db.cliente.findUnique({
       where: { id },
       include: {
@@ -29,8 +30,19 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
     }),
     db.regiao.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
     db.produto.findMany({ where: { ativo: true }, include: { item: true }, orderBy: [{ item: { ordem: "asc" } }, { preco: "desc" }] }),
+    // Vendas dos últimos 30 dias (pela entrega, sem cancelados)
+    db.pedido.findMany({
+      where: { clienteId: id, status: { not: "CANCELADO" }, dataEntrega: { gte: inicioDoDia(somarDias(diaISO(), -29)), lte: fimDoDia(diaISO()) } },
+      include: { itens: { include: { produto: true } } },
+    }),
   ]);
   if (!cliente) notFound();
+  const login = cliente.usuario?.codigoAcesso;
+  const qr = login ? await qrDeAcesso(login) : null;
+  const faturado30 = vendas.reduce((s, p) => s + p.total, 0);
+  const caixas30 = vendas.reduce((s, p) => s + p.itens.reduce((t, i) => t + i.quantidade * (i.produto.fatorEstoque ?? 0), 0), 0);
+  const emAberto = cliente.cobrancas.filter((c) => !c.pagoEm).reduce((s, c) => s + c.valor, 0);
+  const vencido = cliente.cobrancas.filter((c) => !c.pagoEm && c.vencimento < hoje).reduce((s, c) => s + c.valor, 0);
   const especial = new Map(cliente.precosEspeciais.map((p) => [p.produtoId, p.preco]));
 
   return (
@@ -40,7 +52,11 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
       </Link>
       <Cabecalho
         titulo={cliente.nomeFantasia}
-        subtitulo={`Código ${cliente.usuario?.codigoAcesso ?? "—"} · ${cliente.usuario?.ativo ? "acesso ativo" : "acesso bloqueado"} · ${cliente.usuario?.ultimoAcesso ? `último acesso ${formatarDataCurta(cliente.usuario.ultimoAcesso)}` : "nunca entrou"}`}
+        subtitulo={
+          cliente.usuario
+            ? `${cliente.tipoNegocio} · código ${cliente.usuario.codigoAcesso ?? "—"} · ${cliente.usuario.ativo ? "acesso ativo" : "acesso bloqueado"} · ${cliente.usuario.ultimoAcesso ? `último acesso ${formatarDataCurta(cliente.usuario.ultimoAcesso)}` : "nunca entrou"}`
+            : `${cliente.tipoNegocio} · sem acesso ao app (pede por WhatsApp ou telefone)`
+        }
       >
         {cliente.usuario?.bloqueadoAte && cliente.usuario.bloqueadoAte > new Date() && (
           <form action={desbloquear.bind(null, cliente.id)}>
@@ -54,6 +70,22 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
         )}
       </Cabecalho>
 
+      <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5 [&>*]:min-w-0">
+        {[
+          ["Comprou em 30 dias", reais(faturado30), `${num(vendas.length)} pedidos`],
+          ["Caixas em 30 dias", `${num(Math.round(caixas30 * 10) / 10)} cx`, `${num(Math.round((caixas30 / 30) * 7 * 10) / 10)} cx por semana`],
+          ["Ticket médio", vendas.length ? reais(faturado30 / vendas.length) : "—", "por pedido"],
+          ["Em aberto", reais(emAberto), vencido ? `${reais(vencido)} vencido` : "nada vencido"],
+          ["Pagamento", condicaoPagamento(cliente.prazoPagamentoDias), `${cliente.formaPagamento ?? "—"} · ${cliente.notaFiscal ? "com NF" : "sem NF"}`],
+        ].map(([rotulo, valor, sub], i) => (
+          <div key={rotulo} className={`cartao p-4 ${i === 3 && vencido ? "ring-2 ring-red-300" : ""}`}>
+            <p className="text-xs font-medium uppercase tracking-wide text-stone-500">{rotulo}</p>
+            <p className="tabular mt-1 text-xl font-bold text-marca-950">{valor}</p>
+            <p className={`text-xs ${i === 3 && vencido ? "font-semibold text-red-700" : "text-stone-500"}`}>{sub}</p>
+          </div>
+        ))}
+      </section>
+
       <div className="grid gap-6 xl:grid-cols-2 [&>*]:min-w-0">
         <section className="cartao p-5">
           <h2 className="mb-3 font-semibold text-marca-950">Dados do cliente</h2>
@@ -61,22 +93,41 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
             clienteId={cliente.id}
             inicial={{
               nomeFantasia: cliente.nomeFantasia, razaoSocial: cliente.razaoSocial, cnpj: cliente.cnpj, tipoNegocio: cliente.tipoNegocio, responsavel: cliente.responsavel,
-              whatsapp: cliente.whatsapp, email: cliente.email, endereco: cliente.endereco, cep: cliente.cep, consumoSemanal: cliente.consumoSemanal,
+              whatsapp: cliente.whatsapp, email: cliente.email, endereco: cliente.endereco, bairro: cliente.bairro, cidade: cliente.cidade, cep: cliente.cep, consumoSemanal: cliente.consumoSemanal,
               limiteCredito: cliente.limiteCredito, observacoes: cliente.observacoes,
             }}
           />
         </section>
 
         <section className="cartao p-5">
-          <h2 className="mb-3 font-semibold text-marca-950">Negociação</h2>
+          <h2 className="mb-3 font-semibold text-marca-950">Pagamento, nota e negociação</h2>
           <FormCondicoes
             clienteId={cliente.id}
             regioes={regioes.map((r) => ({ id: r.id, nome: r.nome }))}
-            inicial={{ regiaoId: cliente.regiaoId, prazoPagamentoDias: cliente.prazoPagamentoDias, formaPagamento: cliente.formaPagamento, negociacao: cliente.negociacao }}
+            inicial={{ regiaoId: cliente.regiaoId, prazoPagamentoDias: cliente.prazoPagamentoDias, formaPagamento: cliente.formaPagamento, notaFiscal: cliente.notaFiscal, negociacao: cliente.negociacao }}
           />
           <div className="mt-5 border-t border-stone-100 pt-4">
-            <p className="mb-2 text-xs text-stone-500">Esqueceu a senha? Gere outra (o código continua o mesmo).</p>
-            <BotaoNovaSenha clienteId={cliente.id} linkApp={linkDoApp()} />
+            {cliente.usuario ? (
+              <>
+                {qr && login && (
+                  <div className="mb-4 flex items-center gap-4 rounded-xl bg-stone-50 p-3">
+                    <div className="size-32 shrink-0 [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: qr }} />
+                    <div className="min-w-0 text-xs text-stone-600">
+                      <b className="block text-sm text-marca-900">QR de acesso · {login}</b>
+                      Mostre na visita: o cliente escaneia com a câmera e o app abre com o login dele preenchido. Falta só a senha.
+                      <span className="mt-1 block break-all text-stone-400">{linkDeAcesso(login)}</span>
+                    </div>
+                  </div>
+                )}
+                <p className="mb-2 text-xs text-stone-500">Esqueceu a senha? Gere outra (o login continua o mesmo).</p>
+                <BotaoNovaSenha clienteId={cliente.id} linkApp={linkDoApp()} />
+              </>
+            ) : (
+              <>
+                <p className="mb-2 text-xs text-stone-500">Esse cliente ainda não tem o app. Libere e passe o login e a senha pra ele.</p>
+                <BotaoLiberarApp clienteId={cliente.id} linkApp={linkDoApp()} />
+              </>
+            )}
           </div>
         </section>
 

@@ -7,6 +7,8 @@ import { exigirCliente } from "@/lib/sessao";
 import { BotaoInstalar } from "../dica-instalar";
 import { IconeEggs, MarcaEggs } from "../marca-eggs";
 import { AvisoAtualizacao } from "./aviso-atualizacao";
+import { Avisador } from "./avisador";
+import { BotaoAjuda } from "./botao-ajuda";
 import { NavEggs } from "./nav-eggs";
 
 export default async function LayoutAppEggs({ children }: LayoutProps<"/eggs">) {
@@ -47,6 +49,8 @@ export default async function LayoutAppEggs({ children }: LayoutProps<"/eggs">) 
         </div>
       </header>
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 pb-28 pt-5">{children}</main>
+      <BotaoAjuda />
+      <Avisador />
       <NavEggs />
       <AvisoAtualizacao versao={versaoDoApp().id} />
     </>

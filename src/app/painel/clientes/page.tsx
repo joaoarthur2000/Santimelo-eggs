@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { Cabecalho } from "@/components/ui";
+import { condicaoPagamento } from "@/lib/constantes";
 import { diaISO, formatarDataCurta } from "@/lib/datas";
 import { db } from "@/lib/db";
 import { reais } from "@/lib/formato";
-import { linkDoApp } from "@/lib/rede";
-import { FormDarAcesso } from "../forms";
 
 export const metadata: Metadata = { title: "Clientes" };
 
 export default async function ClientesEggs() {
   const hoje = diaISO();
-  const [clientes, outros, regioes] = await Promise.all([
+  const [clientes] = await Promise.all([
     db.cliente.findMany({
       include: {
         usuario: true,
@@ -22,21 +22,23 @@ export default async function ClientesEggs() {
       },
       orderBy: { nomeFantasia: "asc" },
     }),
-    db.cliente.findMany({ where: { usuario: null, ativo: true }, orderBy: { nomeFantasia: "asc" }, select: { id: true, nomeFantasia: true } }),
-    db.regiao.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
   ]);
 
   return (
     <>
-      <Cabecalho titulo="Clientes" subtitulo="Só quem a Santimelo libera entra no app. Cada cliente tem região, prazo de pagamento e preço combinado." />
-      <div className="grid gap-6 xl:grid-cols-[1fr_400px] [&>*]:min-w-0">
+      <Cabecalho titulo="Clientes" subtitulo="Restaurantes, lancherias, padarias e confeitarias de Porto Alegre e região. Só quem a Santimelo libera entra no app.">
+        <Link href="/painel/clientes/novo" className="botao-primario px-5 py-2.5">
+          <Plus className="size-4" /> Novo cliente
+        </Link>
+      </Cabecalho>
+      <div className="grid gap-6 [&>*]:min-w-0">
         <section className="cartao overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
               <tr>
                 <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Região</th>
-                <th className="px-4 py-3">Prazo</th>
+                <th className="px-4 py-3">Onde</th>
+                <th className="px-4 py-3">Pagamento</th>
                 <th className="px-4 py-3 text-right">Em aberto</th>
                 <th className="px-4 py-3">Último pedido</th>
                 <th className="px-4 py-3">Acesso</th>
@@ -51,15 +53,25 @@ export default async function ClientesEggs() {
                     <td className="px-4 py-3">
                       <Link href={`/painel/clientes/${c.id}`} className="font-medium text-marca-800 hover:underline">{c.nomeFantasia}</Link>
                       <span className="block text-xs text-stone-500">
-                        <span className="font-mono">{c.usuario?.codigoAcesso ?? "sem código"}</span> · {c.responsavel ?? "—"} · {c._count.pedidos} pedidos pelo app
+                        {c.tipoNegocio} · <span className="font-mono">{c.usuario?.codigoAcesso ?? "sem app"}</span> · {c.responsavel ?? "—"}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{c.regiao?.nome ?? <span className="text-amber-700">definir</span>}</td>
-                    <td className="px-4 py-3">{c.prazoPagamentoDias ? `${c.prazoPagamentoDias} dias` : "na entrega"}</td>
+                    <td className="px-4 py-3">
+                      {c.bairro ?? "—"}
+                      <span className="block text-xs text-stone-500">{c.cidade ?? "—"} · {c.regiao?.nome ?? <span className="text-amber-700">sem região</span>}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {condicaoPagamento(c.prazoPagamentoDias)}
+                      <span className="block text-xs text-stone-500">
+                        {c.formaPagamento ?? "—"} · <span className={c.notaFiscal ? "font-semibold text-marca-700" : ""}>{c.notaFiscal ? "com NF" : "sem NF"}</span>
+                      </span>
+                    </td>
                     <td className={`tabular px-4 py-3 text-right ${vencida ? "font-semibold text-red-700" : ""}`}>{aberto ? reais(aberto) : "—"}</td>
                     <td className="px-4 py-3 text-stone-600">{c.pedidos[0] ? formatarDataCurta(c.pedidos[0].dataEntrega) : "—"}</td>
                     <td className="px-4 py-3">
-                      {!c.usuario?.ativo ? (
+                      {!c.usuario ? (
+                        <span className="text-stone-500">sem app</span>
+                      ) : !c.usuario.ativo ? (
                         <span className="text-stone-500">bloqueado</span>
                       ) : c.usuario.bloqueadoAte && c.usuario.bloqueadoAte > new Date() ? (
                         <span className="text-red-700">senha errada (travado)</span>
@@ -73,17 +85,12 @@ export default async function ClientesEggs() {
               })}
               {clientes.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-stone-500">Nenhum cliente no EGGS ainda. Libere o primeiro ao lado.</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-stone-500">Nenhum cliente ainda. Toque em &quot;Novo cliente&quot; pra cadastrar o primeiro.</td>
                 </tr>
               )}
             </tbody>
           </table>
         </section>
-        <aside className="cartao h-fit p-5">
-          <h2 className="mb-1 font-semibold text-marca-950">Liberar o app pra um cliente</h2>
-          <p className="mb-4 text-xs text-stone-500">Gera um código de acesso e uma senha só dele, pra passar pro cliente.{regioes.length === 0 && " Crie uma região na aba Entregas antes, pra ele poder agendar."}</p>
-          <FormDarAcesso regioes={regioes.map((r) => ({ id: r.id, nome: r.nome }))} clientes={outros.map((c) => ({ id: c.id, nome: c.nomeFantasia }))} linkApp={linkDoApp()} />
-        </aside>
       </div>
     </>
   );

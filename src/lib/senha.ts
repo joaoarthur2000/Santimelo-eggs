@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt, scryptSync, timingSafeEqual } from "node:crypto";
 
 // Formato salvo: "salt:hash" (hex), scrypt do Node — sem dependência externa
 export function gerarHash(senha: string): string {
@@ -11,5 +11,14 @@ export function conferirSenha(senha: string, salvo: string): boolean {
   if (!salt || !hash) return false;
   const esperado = Buffer.from(hash, "hex");
   const recebido = scryptSync(senha, salt, esperado.length);
+  return timingSafeEqual(esperado, recebido);
+}
+
+/** Igual a conferirSenha, sem travar o servidor (usada pra conferir várias de uma vez) */
+export async function conferirSenhaAsync(senha: string, salvo: string): Promise<boolean> {
+  const [salt, hash] = salvo.split(":");
+  if (!salt || !hash) return false;
+  const esperado = Buffer.from(hash, "hex");
+  const recebido = await new Promise<Buffer>((ok, falha) => scrypt(senha, salt, esperado.length, (e, b) => (e ? falha(e) : ok(b))));
   return timingSafeEqual(esperado, recebido);
 }

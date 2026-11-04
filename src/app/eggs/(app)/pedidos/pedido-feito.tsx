@@ -28,7 +28,7 @@ export function PedidoFeito({ pedido }: { pedido: { id: number; total: number; d
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-casca-700">Pedido #{pedido.id} confirmado</p>
           <h2 className="mt-1 font-eggs text-[2rem] font-extrabold leading-[1.05]">Parabéns pela compra!</h2>
         </div>
-        <Guinho pose="comemorando" className="eggs-balanca -mr-1 -mt-1 h-28 w-24 shrink-0" />
+        <Guinho pose="comemorando" className="eggs-ginga -mr-1 -mt-1 h-28 w-24 shrink-0" />
       </div>
 
       <p className="relative mt-2 text-base font-medium">Seu pedido será preparado com carinho e será entregue na data combinada.</p>

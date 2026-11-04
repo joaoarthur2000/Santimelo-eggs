@@ -2,7 +2,7 @@
 // Produtos e preços dos ovos são os REAIS (vieram do sistema da Suprema em 2026-11-02: custo R$ 125/cx na granja,
 // venda R$ 190/cx). Clientes, pedidos, compras e cobranças abaixo são EXEMPLO, pra os relatórios terem números.
 // Rodar: npm run db:seed (não faz nada se já houver dados) · npm run db:reset (apaga e recria)
-// Acessos de exemplo: painel joao@santimelo.local / senha123 · app EGG-PADR, EGG-DCGM, EGG-SMSH, EGG-BELL / ovos123
+// Acessos de exemplo: teste ADM123 / 123 (painel; pela tela do app, entra como "Santimelo (teste)") · app EGG-PADR, EGG-DCGM, EGG-SMSH, EGG-BELL / ovos123
 import { PrismaClient } from "@prisma/client";
 import { gerarHash } from "../src/lib/senha";
 import { diaISO, inicioDoDia, somarDias } from "../src/lib/datas";
@@ -23,49 +23,36 @@ const quando = (dia: string, hora: string) => {
   return new Date(inicioDoDia(dia).getTime() + (h * 60 + m) * 60000);
 };
 
-// Tipos de ovo e o que se vende de cada um (caixa = 360 ovos)
+// Só ovos: bandeja de 30 e caixa de 30 dúzias (360 ovos = 12 bandejas de 30)
 const CATALOGO = [
   {
     codigo: "1",
     nome: "Ovo branco",
     produtos: [
-      { codigo: "OVOS BRANCOS 30UN BD #CAIXA", embalagem: "Caixa (12 bandejas de 30)", unidade: "caixa", fatorEstoque: 1, preco: 190, precoAntes: 185 },
-      { codigo: "OVOS BRANCOS 30UN BD", embalagem: "Bandeja 30 un", unidade: "bandeja", fatorEstoque: 1 / 12, preco: 20.59 },
+      { codigo: "OVOS BRANCOS 30UN BD #CAIXA", embalagem: "Caixa 30 dúzias", unidade: "caixa", fatorEstoque: 1, preco: 190, precoAntes: 185 },
+      { codigo: "OVOS BRANCOS 30UN BD", embalagem: "Bandeja 30 ovos", unidade: "bandeja", fatorEstoque: 1 / 12, preco: 20.59 },
     ],
   },
   {
     codigo: "2",
-    nome: "Ovo vermelho",
-    produtos: [
-      { codigo: "OVOS VERMELHOS 30UN BD #CAIXA", embalagem: "Caixa (12 bandejas de 30)", unidade: "caixa", fatorEstoque: 1, preco: 190, precoAntes: 185 },
-      { codigo: "OVOS VERMELHOS 30UN BD", embalagem: "Bandeja 30 un", unidade: "bandeja", fatorEstoque: 1 / 12, preco: 25.65 },
-    ],
-  },
-  {
-    codigo: "3",
     nome: "Ovo caipira",
     produtos: [
-      { codigo: "OVO CAIPIRA DZ BD #CAIXA", embalagem: "Caixa (30 bandejas de 12)", unidade: "caixa", fatorEstoque: 1, preco: 513 },
-      { codigo: "OVO CAIPIRA DZ BD", embalagem: "Bandeja 12 un", unidade: "bandeja", fatorEstoque: 1 / 30, preco: 17.1 },
+      { codigo: "OVO CAIPIRA 30UN BD", embalagem: "Bandeja 30 ovos", unidade: "bandeja", fatorEstoque: 1 / 12, preco: 42.75 },
+      { codigo: "OVO CAIPIRA 20UN PLAST", embalagem: "Plastificado 20 ovos", unidade: "pacote", fatorEstoque: 20 / 360, preco: 28.5 },
     ],
-  },
-  {
-    codigo: "4",
-    nome: "Ovo solto (produção)",
-    produtos: [{ codigo: "OVO SOLTO PRODUCAO #CAIXA", embalagem: "Caixa solto (30 dúzias)", unidade: "caixa", fatorEstoque: 1, preco: 190 }],
   },
 ];
 
 // Custo de compra por caixa (EXEMPLO, a granja cobra R$ 125 no branco)
-const CUSTO: Record<string, number> = { "Ovo branco": 125, "Ovo vermelho": 132, "Ovo caipira": 360, "Ovo solto (produção)": 118 };
+const CUSTO: Record<string, number> = { "Ovo branco": 125, "Ovo caipira": 360 };
 
 async function main() {
   const vazia = async (contar: () => Promise<number>) => (await contar()) === 0;
   const hoje = diaISO();
 
-  // Equipe — senha inicial (trocar antes de ir pra nuvem)
+  // Equipe — login de teste ADM123 / 123 (trocar antes de ir pra nuvem)
   if (await vazia(() => db.usuario.count({ where: { papel: "DIRETOR" } }))) {
-    await db.usuario.create({ data: { nome: "João Arthur", email: "joao@santimelo.local", senhaHash: gerarHash("senha123"), papel: "DIRETOR" } });
+    await db.usuario.create({ data: { nome: "João Arthur", email: "joao@santimelo.local", codigoAcesso: "ADM123", senhaHash: gerarHash("123"), papel: "DIRETOR" } });
   }
 
   // Catálogo
@@ -123,27 +110,27 @@ async function main() {
     const CLIENTES = [
       {
         codigo: "EGG-PADR",
-        dados: { nomeFantasia: "Padaria Pão Quente", razaoSocial: "Pão Quente Panificadora Ltda", tipoNegocio: "Padaria", responsavel: "Marina", whatsapp: "(51) 99321-4455", endereco: "Av. Assis Brasil, 3200 - Passo d'Areia", cep: "91010-003", consumoSemanal: 3, limiteCredito: 3000, prazoPagamentoDias: 7, formaPagamento: "Pix", regiaoId: regiao["Zona Norte"], negociacao: "Mínimo de 1 caixa por pedido. Ovo trincado é trocado na próxima entrega." },
-        cesta: () => [{ p: produto("Ovo branco", "caixa"), q: escolher([1, 1, 1.5, 2]) }, aleatorio() < 0.4 && { p: produto("Ovo caipira", "bandeja"), q: escolher([5, 10]) }],
+        dados: { nomeFantasia: "Padaria Pão Quente", razaoSocial: "Pão Quente Panificadora Ltda", tipoNegocio: "Padaria", responsavel: "Marina", whatsapp: "(51) 99321-4455", endereco: "Av. Assis Brasil, 3200", bairro: "Passo d'Areia", cidade: "Porto Alegre", cep: "91010-003", notaFiscal: false, consumoSemanal: 3, limiteCredito: 3000, prazoPagamentoDias: 7, formaPagamento: "Pix", regiaoId: regiao["Zona Norte"], negociacao: "Mínimo de 1 caixa por pedido. Ovo trincado é trocado na próxima entrega." },
+        cesta: () => [{ p: produto("Ovo branco", "caixa"), q: escolher([1, 1, 1.5, 2]) }, aleatorio() < 0.4 && { p: produto("Ovo caipira", "bandeja"), q: escolher([2, 4]) }],
         vezes: 0.7,
       },
       {
         codigo: "EGG-DCGM",
-        dados: { nomeFantasia: "Confeitaria Doce Gema", razaoSocial: "Doce Gema Confeitaria Ltda", tipoNegocio: "Confeitaria", responsavel: "Rafael", whatsapp: "(51) 99555-0101", cnpj: "12.345.678/0001-90", endereco: "Rua da República, 410 - Cidade Baixa", cep: "90050-320", consumoSemanal: 4, limiteCredito: 5000, prazoPagamentoDias: 14, formaPagamento: "Boleto", regiaoId: regiao["Centro"], negociacao: "Preço especial na caixa de ovo branco por volume (2 caixas por semana)." },
-        cesta: () => [{ p: produto("Ovo branco", "caixa"), q: escolher([1, 2, 2]) }, aleatorio() < 0.5 && { p: produto("Ovo solto (produção)", "caixa"), q: 1 }],
+        dados: { nomeFantasia: "Confeitaria Doce Gema", razaoSocial: "Doce Gema Confeitaria Ltda", tipoNegocio: "Confeitaria", responsavel: "Rafael", whatsapp: "(51) 99555-0101", cnpj: "12.345.678/0001-90", endereco: "Rua da República, 410", bairro: "Cidade Baixa", cidade: "Porto Alegre", cep: "90050-320", notaFiscal: true, consumoSemanal: 4, limiteCredito: 5000, prazoPagamentoDias: 14, formaPagamento: "Boleto", regiaoId: regiao["Centro"], negociacao: "Preço especial na caixa de ovo branco por volume (2 caixas por semana)." },
+        cesta: () => [{ p: produto("Ovo branco", "caixa"), q: escolher([1, 2, 2]) }, aleatorio() < 0.5 && { p: produto("Ovo caipira", "pacote"), q: escolher([3, 5]) }],
         vezes: 0.8,
         especial: { item: "Ovo branco", unidade: "caixa", preco: 182 },
       },
       {
         codigo: "EGG-SMSH",
-        dados: { nomeFantasia: "Smash Burger POA", razaoSocial: "Smash POA Lanches Ltda", tipoNegocio: "Hamburgueria", responsavel: "Diego", whatsapp: "(51) 98444-2020", endereco: "Rua Lima e Silva, 880 - Cidade Baixa", cep: "90050-100", consumoSemanal: 1.5, limiteCredito: 1500, prazoPagamentoDias: 0, formaPagamento: "Pix na entrega", regiaoId: regiao["Centro"] },
-        cesta: () => [{ p: produto("Ovo vermelho", "caixa"), q: escolher([0.5, 1]) }, aleatorio() < 0.5 && { p: produto("Ovo branco", "bandeja"), q: escolher([4, 6]) }],
+        dados: { nomeFantasia: "Smash Burger POA", razaoSocial: "Smash POA Lanches Ltda", tipoNegocio: "Lancheria", responsavel: "Diego", whatsapp: "(51) 98444-2020", endereco: "Rua Lima e Silva, 880", bairro: "Cidade Baixa", cidade: "Porto Alegre", cep: "90050-100", notaFiscal: false, consumoSemanal: 1.5, limiteCredito: 1500, prazoPagamentoDias: 0, formaPagamento: "Pix na entrega", regiaoId: regiao["Centro"] },
+        cesta: () => [{ p: produto("Ovo branco", "caixa"), q: escolher([0.5, 1]) }, aleatorio() < 0.5 && { p: produto("Ovo branco", "bandeja"), q: escolher([4, 6]) }],
         vezes: 0.55,
       },
       {
         codigo: "EGG-BELL",
-        dados: { nomeFantasia: "Bella Massa Restaurante", razaoSocial: "Bella Massa Alimentos Ltda", tipoNegocio: "Restaurante", responsavel: "Luciana", whatsapp: "(51) 99777-3131", endereco: "Av. Sertório, 1500 - Sarandi", cep: "91110-000", consumoSemanal: 2, limiteCredito: 2500, prazoPagamentoDias: 7, formaPagamento: "Boleto", regiaoId: regiao["Zona Norte"] },
-        cesta: () => [{ p: produto("Ovo caipira", "caixa"), q: 0.5 }, { p: produto("Ovo branco", "caixa"), q: escolher([0.5, 1]) }],
+        dados: { nomeFantasia: "Bella Massa Restaurante", razaoSocial: "Bella Massa Alimentos Ltda", tipoNegocio: "Restaurante", responsavel: "Luciana", whatsapp: "(51) 99777-3131", endereco: "Av. Sertório, 1500", bairro: "Sarandi", cidade: "Porto Alegre", cep: "91110-000", notaFiscal: true, consumoSemanal: 2, limiteCredito: 2500, prazoPagamentoDias: 7, formaPagamento: "Boleto", regiaoId: regiao["Zona Norte"] },
+        cesta: () => [{ p: produto("Ovo caipira", "bandeja"), q: escolher([4, 6]) }, { p: produto("Ovo branco", "caixa"), q: escolher([0.5, 1]) }],
         vezes: 0.5,
       },
     ];
@@ -179,6 +166,7 @@ async function main() {
             clienteId: cliente.id,
             origem: aleatorio() < 0.85 ? "APP" : "WHATSAPP",
             janelaId: janela.id,
+            notaFiscal: c.dados.notaFiscal,
             status,
             dataEntrega,
             criadoEm: new Date(dataEntrega.getTime() - (1 + Math.floor(aleatorio() * 2)) * 864e5),
@@ -225,8 +213,18 @@ async function main() {
     const branco = itens.find((i) => i.nome === "Ovo branco")!;
     await db.movimentoEstoque.create({ data: { itemId: branco.id, tipo: "PERDA", quantidade: -0.25, data: quando(somarDias(hoje, -6), "15:00"), autor: "Exemplo", observacao: "Bandejas trincadas no transporte" } });
 
-    // Previsibilidade: aumento da caixa vermelha já avisado com uma semana de antecedência
-    await db.precoAgendado.create({ data: { produtoId: produto("Ovo vermelho", "caixa").id, preco: 195, aPartirDe: somarDias(hoje, 7), autor: "João Arthur" } });
+    // Previsibilidade: aumento da bandeja de branco já avisado com uma semana de antecedência
+    await db.precoAgendado.create({ data: { produtoId: produto("Ovo branco", "bandeja").id, preco: 21.5, aPartirDe: somarDias(hoje, 7), autor: "João Arthur" } });
+  }
+
+  // Login de teste ADM123: pela tela do app, entra como esse cliente (pedidos de teste aparecem no painel e nos relatórios)
+  const adm = await db.usuario.findUnique({ where: { codigoAcesso: "ADM123" } });
+  if (adm && !adm.clienteId) {
+    const regiao = await db.regiao.findFirst({ orderBy: { nome: "desc" } });
+    const teste = await db.cliente.create({
+      data: { nomeFantasia: "Santimelo (teste)", razaoSocial: "Cliente de teste", tipoNegocio: "Padaria", responsavel: "João Arthur", bairro: "Sarandi", cidade: "Porto Alegre", regiaoId: regiao?.id, prazoPagamentoDias: 7, formaPagamento: "Pix", observacoes: "Cliente de teste do login ADM123. Apagar antes de ir pra nuvem." },
+    });
+    await db.usuario.update({ where: { id: adm.id }, data: { clienteId: teste.id } });
   }
 }
 

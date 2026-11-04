@@ -9,6 +9,10 @@ export const CONFIG = {
   MANUTENCAO: "eggs.manutencao", // "1" = app EGGS fora do ar pros clientes
   MANUTENCAO_TEXTO: "eggs.manutencaoTexto",
   NOVIDADES: "eggs.novidades", // texto do aviso "tem atualização"
+  WHATSAPP_ATENDIMENTO: "eggs.whatsappAtendimento", // número da Santimelo que o chat do Guinho abre (só dígitos, com DDD)
+  ROTA_SAIDA: "rota.saida", // de onde o carro sai e pra onde volta: { endereco, lat, lng }
+  ROTA_CONSUMO: "rota.consumo", // km por litro do carro de entrega
+  ROTA_PRECO: "rota.precoLitro", // R$ do litro de combustível
 } as const;
 
 export async function lerConfig(chave: string) {

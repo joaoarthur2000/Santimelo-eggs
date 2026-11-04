@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { PedidosQueChegaram } from "./pedidos/chegaram";
+import { AtualizaSozinho } from "@/components/atualiza-sozinho";
 import { ArrowRight } from "lucide-react";
 import { GraficoBarras } from "@/components/grafico-barras";
 import { GraficoLinhas } from "@/components/grafico-linhas";
@@ -69,10 +71,13 @@ export default async function Inicio() {
   return (
     <>
       <Cabecalho titulo="Início" subtitulo={`${formatarDia(hoje)} · caixa = 12 bandejas de 30 (360 ovos)`}>
+        <AtualizaSozinho segundos={30} />
         <Link href="/painel/relatorios" className="botao-primario">
           Relatórios de vendas <ArrowRight className="size-4" />
         </Link>
       </Cabecalho>
+
+      <PedidosQueChegaram />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6 [&>*]:min-w-0">
         <Link href={`/painel/pedidos?dia=${hoje}`} className="block transition hover:-translate-y-0.5">

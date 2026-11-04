@@ -3,21 +3,22 @@ import { ArrowRight, CalendarClock, MessageCircleHeart, Truck, Wallet } from "lu
 import { DIAS_SEMANA, STATUS_PEDIDO, type StatusPedido } from "@/lib/constantes";
 import { diaDaSemana, diaISO, formatarDia, formatarHora, inicioDoDia } from "@/lib/datas";
 import { db } from "@/lib/db";
+import { diasEntre, extratoDoCliente } from "@/lib/financeiro";
 import { agendaDaRegiao, nomeDoCliente, produtosDoCliente } from "@/lib/eggs";
 import { reais } from "@/lib/formato";
 import { exigirCliente } from "@/lib/sessao";
 import { marcarMensagensLidas } from "./actions";
 import { Brilho, Faixa, Ovo, SeloPreco, tipoDoOvo } from "./enfeites";
-import { Guinho3D } from "./guinho-3d";
+import { GuinhoAnimado } from "./guinho-animado";
 
 const atraso = (i: number) => ({ "--i": i }) as React.CSSProperties;
 
 export default async function InicioEggs() {
   const { cliente } = await exigirCliente();
   const hoje = diaISO();
-  const [mensagens, cobranca, proximoPedido, produtos, agenda] = await Promise.all([
+  const [mensagens, extrato, proximoPedido, produtos, agenda] = await Promise.all([
     db.mensagem.findMany({ where: { clienteId: cliente.id, lidaEm: null }, orderBy: { criadaEm: "desc" } }),
-    db.cobranca.findFirst({ where: { clienteId: cliente.id, pagoEm: null }, orderBy: { vencimento: "asc" } }),
+    extratoDoCliente(cliente.id),
     db.pedido.findFirst({
       where: { clienteId: cliente.id, status: { notIn: ["ENTREGUE", "CANCELADO"] }, dataEntrega: { gte: inicioDoDia(hoje) } },
       include: { janela: true },
@@ -26,10 +27,10 @@ export default async function InicioEggs() {
     produtosDoCliente(cliente.id),
     agendaDaRegiao(cliente.regiaoId, 7),
   ]);
-  const diasAte = (dia: string) => Math.round((inicioDoDia(dia).getTime() - inicioDoDia(hoje).getTime()) / 864e5);
-  const caixas = produtos.filter((p) => p.unidade === "caixa");
+  const caixas = produtos;
   const proximaEntrega = agenda.find((d) => d.janelas.some((j) => j.livres > 0));
-  const dc = cobranca ? diasAte(cobranca.vencimento) : null;
+  const proximo = extrato.proximoVencimento;
+  const dp = proximo ? diasEntre(hoje, proximo.vencimento) : null;
 
   return (
     <div className="space-y-5">
@@ -43,7 +44,7 @@ export default async function InicioEggs() {
           </h1>
           <p className="mt-2 text-sm font-semibold text-casca-700">O Guinho separou os ovos mais fresquinhos pra você.</p>
         </div>
-        <Guinho3D className="-my-4 -mr-2 h-48 w-40 shrink-0 sm:h-56 sm:w-48" />
+        <GuinhoAnimado className="-my-4 -mr-2 h-48 w-44 shrink-0 sm:h-56 sm:w-52" />
       </section>
 
       <Faixa frases={["Ovos fresquinhos", "Direto da granja", "Entrega no seu horário", "Preço sem surpresa"]} />
@@ -93,24 +94,29 @@ export default async function InicioEggs() {
           )}
         </section>
 
-        <section className={`eggs-entra cartao-eggs ${dc !== null && dc < 0 ? "ring-2 ring-tomate-500" : ""}`} style={atraso(4)}>
-          <p className="titulo-eggs flex items-center gap-1.5"><Wallet className="size-4" /> Próximo pagamento</p>
-          {cobranca && dc !== null ? (
-            <Link href="/eggs/conta" className="mt-2 block">
-              <p className="tabular font-eggs text-2xl font-extrabold">{reais(cobranca.valor)}</p>
-              <p className={`text-sm font-semibold ${dc < 0 ? "text-tomate-600" : dc <= 3 ? "text-gema-700" : "text-casca-700"}`}>
-                {dc < 0 ? `Venceu há ${-dc} ${dc === -1 ? "dia" : "dias"}` : dc === 0 ? "Vence hoje" : `Vence em ${dc} ${dc === 1 ? "dia" : "dias"} · ${formatarDia(cobranca.vencimento, { day: "2-digit", month: "2-digit" })}`}
-              </p>
-            </Link>
-          ) : (
-            <p className="mt-2 text-sm text-casca-700">Tudo em dia. Nenhuma conta em aberto.</p>
-          )}
-        </section>
+        <Link
+          href="/eggs/financeiro"
+          className={`eggs-entra eggs-toque cartao-eggs block ${extrato.vencido > 0 ? "ring-2 ring-tomate-500" : ""}`}
+          style={atraso(4)}
+        >
+          <p className="titulo-eggs flex items-center gap-1.5"><Wallet className="size-4" /> Valor em aberto</p>
+          <p className="tabular mt-2 font-eggs text-2xl font-extrabold">{reais(extrato.emAberto)}</p>
+          <p className={`text-sm font-semibold ${extrato.vencido > 0 ? "text-tomate-600" : dp !== null && dp <= 3 ? "text-gema-700" : "text-casca-700"}`}>
+            {extrato.vencido > 0
+              ? `${reais(extrato.vencido)} vencido`
+              : proximo && dp !== null
+                ? dp === 0 ? "Vence hoje" : `Próximo vencimento ${formatarDia(proximo.vencimento, { day: "2-digit", month: "2-digit" })}`
+                : "Tudo em dia"}
+          </p>
+          <span className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-casca-700">
+            Ver extrato completo <ArrowRight className="size-3.5" />
+          </span>
+        </Link>
       </div>
 
       <section className="eggs-entra cartao-eggs" style={atraso(5)}>
         <div className="flex items-center justify-between">
-          <p className="titulo-eggs flex items-center gap-1.5"><CalendarClock className="size-4" /> Preço da caixa hoje</p>
+          <p className="titulo-eggs flex items-center gap-1.5"><CalendarClock className="size-4" /> Preços de hoje</p>
           <Link href="/eggs/precos" className="text-sm font-semibold text-casca-700 hover:underline">Ver todos</Link>
         </div>
         <ul className="mt-3 grid grid-cols-2 gap-3">
@@ -123,6 +129,7 @@ export default async function InicioEggs() {
                 </span>
               </div>
               <p className="mt-1 text-sm font-bold leading-tight">{p.item.replace(/^Ovo /, "")}</p>
+              <p className="text-[11px] font-medium text-casca-500">{p.embalagem}</p>
               {p.negociado && <span className="mt-1 rounded-full bg-gema-200 px-2 py-0.5 text-[10px] font-bold">seu preço</span>}
               {p.proximos[0] && (
                 <span className="mt-1 text-[11px] font-semibold text-gema-700">

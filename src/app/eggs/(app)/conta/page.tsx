@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { Handshake, LogOut, MessageCircle, Receipt } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Handshake, LifeBuoy, LogOut, MessageCircle, Receipt } from "lucide-react";
 import { diaISO, formatarDia } from "@/lib/datas";
 import { db } from "@/lib/db";
+import { extratoDoCliente } from "@/lib/financeiro";
 import { nomeProduto, reais } from "@/lib/formato";
 import { exigirCliente } from "@/lib/sessao";
 import { sairEggs } from "../../../login/actions";
@@ -13,14 +15,11 @@ export const metadata: Metadata = { title: "Minha conta" };
 
 export default async function ContaEggs() {
   const { cliente, usuario } = await exigirCliente();
-  const hoje = diaISO();
-  const [abertas, pagas, especiais, mensagens] = await Promise.all([
-    db.cobranca.findMany({ where: { clienteId: cliente.id, pagoEm: null }, include: { pedido: true }, orderBy: { vencimento: "asc" } }),
-    db.cobranca.findMany({ where: { clienteId: cliente.id, pagoEm: { not: null } }, include: { pedido: true }, orderBy: { pagoEm: "desc" }, take: 8 }),
+  const [{ emAberto: totalAberto }, especiais, mensagens] = await Promise.all([
+    extratoDoCliente(cliente.id),
     db.precoCliente.findMany({ where: { clienteId: cliente.id }, include: { produto: { include: { item: true } } } }),
     db.mensagem.findMany({ where: { clienteId: cliente.id }, orderBy: { criadaEm: "desc" }, take: 30 }),
   ]);
-  const totalAberto = abertas.reduce((s, c) => s + c.valor, 0);
   const naoLidas = mensagens.filter((m) => !m.lidaEm).length;
 
   return (
@@ -58,39 +57,24 @@ export default async function ContaEggs() {
         {cliente.negociacao && <p className="mt-3 whitespace-pre-line rounded-2xl bg-gema-50 p-3 text-sm">{cliente.negociacao}</p>}
       </section>
 
-      <section className="cartao-eggs">
-        <div className="flex items-baseline justify-between">
-          <h2 className="titulo-eggs flex items-center gap-1.5"><Receipt className="size-4" /> Pagamentos</h2>
-          {totalAberto > 0 && <span className="tabular text-sm font-bold">{reais(totalAberto)} em aberto</span>}
-        </div>
-        <ul className="mt-3 divide-y divide-casca-100 text-sm">
-          {abertas.map((c) => {
-            const vencida = c.vencimento < hoje;
-            return (
-              <li key={c.id} className="flex items-center justify-between gap-3 py-2">
-                <span>
-                  <span className="font-semibold">Pedido #{c.pedidoId}</span>
-                  <span className={`block text-xs font-semibold ${vencida ? "text-red-700" : "text-casca-500"}`}>
-                    {vencida ? "Vencida em " : "Vence "}
-                    {formatarDia(c.vencimento, { day: "2-digit", month: "2-digit" })}
-                  </span>
-                </span>
-                <span className="tabular font-bold">{reais(c.valor)}</span>
-              </li>
-            );
-          })}
-          {pagas.map((c) => (
-            <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-casca-500">
-              <span>
-                Pedido #{c.pedidoId}
-                <span className="block text-xs">pago em {formatarDia(diaISO(c.pagoEm!), { day: "2-digit", month: "2-digit" })}</span>
-              </span>
-              <span className="tabular">{reais(c.valor)}</span>
-            </li>
-          ))}
-          {abertas.length + pagas.length === 0 && <li className="py-2 text-casca-700">Nenhum pagamento ainda.</li>}
-        </ul>
-      </section>
+      <Link href="/eggs/financeiro" className="eggs-toque cartao-eggs flex items-center justify-between gap-3">
+        <span>
+          <span className="titulo-eggs flex items-center gap-1.5"><Receipt className="size-4" /> Financeiro</span>
+          <span className="mt-1 block text-sm text-casca-700">Pedidos, pagamentos, vencimentos e o que está em aberto</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1 text-right">
+          <span className="tabular font-bold">{reais(totalAberto)}</span>
+          <ChevronRight className="size-4 text-casca-500" />
+        </span>
+      </Link>
+
+      <Link href="/eggs/ajuda" className="eggs-toque cartao-eggs flex items-center justify-between gap-3">
+        <span>
+          <span className="titulo-eggs flex items-center gap-1.5"><LifeBuoy className="size-4" /> Ajuda</span>
+          <span className="mt-1 block text-sm text-casca-700">Pedido, entrega, pagamento, vendas ou problema no app: fala com o Guinho</span>
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-casca-500" />
+      </Link>
 
       <section className="cartao-eggs">
         <div className="flex items-baseline justify-between">

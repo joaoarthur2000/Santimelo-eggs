@@ -54,11 +54,11 @@ export async function usuarioAtual() {
   return usuario?.ativo ? { ...usuario, papel: usuario.papel as Papel } : null;
 }
 
-/** Usar no topo de páginas e server actions. Equipe acessa o painel; cliente só o app. */
+/** Usar no topo de páginas e server actions. Equipe acessa o painel; cliente só o app. Equipe com cliente vinculado (login de teste) também entra no app. */
 export async function exigirPapel(papel: Papel) {
   const usuario = await usuarioAtual();
   if (!usuario) redirect(papel === PAPEIS.CLIENTE ? "/eggs/entrar" : "/login");
-  const diretorPode = usuario.papel === PAPEIS.DIRETOR && papel !== PAPEIS.CLIENTE;
+  const diretorPode = usuario.papel === PAPEIS.DIRETOR && (papel !== PAPEIS.CLIENTE || !!usuario.clienteId);
   if (usuario.papel !== papel && !diretorPode) redirect(INICIO_DO_PAPEL[usuario.papel] ?? "/login");
   return usuario;
 }

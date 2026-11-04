@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Cabecalho, Etiqueta } from "@/components/ui";
-import { FLUXO_PEDIDO, ORIGENS_PEDIDO, STATUS_PEDIDO, type StatusPedido } from "@/lib/constantes";
+import { condicaoPagamento, FLUXO_PEDIDO, ORIGENS_PEDIDO, STATUS_PEDIDO, type StatusPedido } from "@/lib/constantes";
 import { db } from "@/lib/db";
 import { diaISO, formatarDia, formatarHora, formatarDataCurta } from "@/lib/datas";
 import { quantidade, reais } from "@/lib/formato";
@@ -103,12 +103,13 @@ export default async function Pedido({ params }: PageProps<"/painel/pedidos/[id]
         <aside className="cartao h-fit space-y-2 p-5 text-sm">
           <h2 className="font-semibold text-marca-950">Entrega</h2>
           <Linha rotulo="Cliente" valor={<Link href={`/painel/clientes/${c.id}`} className="text-marca-700 hover:underline">{c.nomeFantasia}</Link>} />
-          <Linha rotulo="Endereço" valor={c.endereco} />
+          <Linha rotulo="Endereço" valor={[c.endereco, c.bairro, c.cidade].filter(Boolean).join(" · ")} />
           <Linha rotulo="Região" valor={c.regiao?.nome} />
           <Linha rotulo="Horário" valor={pedido.janela ? `${pedido.janela.inicio}–${pedido.janela.fim}` : null} />
           <Linha rotulo="Responsável" valor={c.responsavel} />
           <Linha rotulo="WhatsApp" valor={c.whatsapp} />
-          <Linha rotulo="Pagamento" valor={c.formaPagamento} />
+          <Linha rotulo="Pagamento" valor={`${condicaoPagamento(c.prazoPagamentoDias)} · ${c.formaPagamento ?? "—"}`} />
+          <Linha rotulo="Nota fiscal" valor={pedido.notaFiscal ? "Com NF" : "Sem NF"} />
         </aside>
       </div>
     </>

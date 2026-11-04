@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, ClipboardList, LayoutDashboard, Smartphone, Tags, Truck, Users, Wallet, Warehouse } from "lucide-react";
+import { BarChart3, ClipboardList, Headset, LayoutDashboard, Route, Smartphone, Tags, Truck, Users, Wallet, Warehouse } from "lucide-react";
 
 // Agrupado como a operação funciona: vendas → entrega e dinheiro → gestão
 const GRUPOS = [
@@ -18,13 +18,15 @@ const GRUPOS = [
     links: [
       { href: "/painel/pedidos", rotulo: "Pedidos", icone: ClipboardList },
       { href: "/painel/clientes", rotulo: "Clientes", icone: Users },
+      { href: "/painel/atendimentos", rotulo: "Atendimentos", icone: Headset },
       { href: "/painel/precos", rotulo: "Preços", icone: Tags },
     ],
   },
   {
     titulo: "Operação",
     links: [
-      { href: "/painel/entregas", rotulo: "Entregas", icone: Truck },
+      { href: "/painel/rotas", rotulo: "Rotas", icone: Route },
+      { href: "/painel/entregas", rotulo: "Regiões e horários", icone: Truck },
       { href: "/painel/cobrancas", rotulo: "Cobranças", icone: Wallet },
       { href: "/painel/estoque", rotulo: "Estoque", icone: Warehouse },
     ],
@@ -35,7 +37,8 @@ const GRUPOS = [
   },
 ];
 
-export function NavPainel() {
+/** `contadores`: bolinha com o número ao lado do item (pedidos novos, atendimentos abertos) */
+export function NavPainel({ contadores = {} }: { contadores?: Record<string, number> }) {
   const rota = usePathname();
 
   return (
@@ -55,6 +58,9 @@ export function NavPainel() {
               >
                 <Icone className="size-4" />
                 {rotulo}
+                {!!contadores[href] && (
+                  <span className="ml-auto rounded-full bg-gema-400 px-2 py-0.5 text-xs font-bold text-casca-900" aria-label={`${contadores[href]} novos`}>{contadores[href]}</span>
+                )}
               </Link>
             );
           })}

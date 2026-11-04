@@ -5,7 +5,7 @@ import { GraficoVendas } from "@/components/grafico-vendas";
 import { Cabecalho, Codigo, Vazio } from "@/components/ui";
 import { PERIODOS, type Periodo } from "@/lib/constantes";
 import { COR_CUSTO, COR_LUCRO } from "@/lib/cores";
-import { diaISO, diaValido } from "@/lib/datas";
+import { diaISO, diaValido, formatarDia } from "@/lib/datas";
 import { num, pct, quantidade, reais } from "@/lib/formato";
 import { relatorioVendas } from "@/lib/relatorio";
 import { BotaoImprimir } from "./botao-imprimir";
@@ -13,6 +13,8 @@ import { BotaoImprimir } from "./botao-imprimir";
 export const metadata: Metadata = { title: "Relatórios" };
 
 const cx = (v: number) => `${num(Math.round(v * 10) / 10)} cx`;
+const km = (v: number) => `${num(Math.round(v * 10) / 10)} km`;
+const litros = (v: number) => `${num(Math.round(v * 10) / 10)} L`;
 
 /** Seta e % em relação ao período anterior. Cor só reforça: o texto diz se subiu ou caiu */
 function Variacao({ atual, antes, rotulo, inverter = false }: { atual: number; antes: number; rotulo: string; inverter?: boolean }) {
@@ -56,11 +58,12 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
   const melhorProduto = r.porProduto.length > 1 ? r.porProduto.reduce((m, p) => (p.lucro > m.lucro ? p : m)) : null;
   const semCusto = t.semCusto > 0;
   const temAgendado = r.fim >= diaISO();
+  const f = r.fechamento;
   const grafico = r.porFaixa.map((f) => ({ rotulo: f.faixa, faturamento: f.faturamento, custo: f.custo, lucro: f.lucro, semCusto: f.semCusto }));
 
   return (
     <>
-      <Cabecalho titulo="Relatório de vendas" subtitulo={`${PERIODOS[periodo]} · ${r.titulo}`}>
+      <Cabecalho titulo="Relatórios e fechamento" subtitulo={`${PERIODOS[periodo]} · ${r.titulo}`}>
         <nav className="flex rounded-lg bg-white p-1 ring-1 ring-stone-200 print:hidden" aria-label="Período">
           {(Object.keys(PERIODOS) as Periodo[]).map((p) => (
             <Link key={p} href={link(p, dia)} aria-current={p === periodo ? "page" : undefined} className={`rounded-md px-4 py-1.5 text-sm font-medium ${p === periodo ? "bg-marca-800 text-white" : "text-stone-600 hover:bg-stone-100"}`}>
@@ -88,6 +91,42 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
           <BotaoImprimir />
         </div>
       </Cabecalho>
+
+      {/* Fechamento: da venda ao lucro que sobra, e o dinheiro que entrou */}
+      <section className="mb-6 grid gap-4 rounded-2xl bg-marca-900 p-5 text-white lg:grid-cols-[1fr_1.3fr] [&>*]:min-w-0">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-marca-200">Fechamento · {r.titulo}</h2>
+          <dl className="mt-3 space-y-1.5 text-sm">
+            <div className="flex justify-between gap-3"><dt>Faturamento</dt><dd className="tabular font-semibold">{reais(t.faturamento)}</dd></div>
+            <div className="flex justify-between gap-3 text-marca-100"><dt>− Custo dos ovos</dt><dd className="tabular">{reais(t.custo + t.semCusto)}</dd></div>
+            <div className="flex justify-between gap-3 text-marca-100">
+              <dt>− Combustível <span className="text-xs text-marca-200">({km(f.km)} · {litros(f.litros)})</span></dt>
+              <dd className="tabular">{reais(f.combustivel)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 border-t border-white/20 pt-2">
+              <dt className="font-semibold">{f.lucroLiquido < 0 ? "Prejuízo" : "Lucro líquido"}</dt>
+              <dd className={`tabular text-3xl font-extrabold ${f.lucroLiquido < 0 ? "text-red-300" : "text-gema-300"}`}>{reais(f.lucroLiquido)}</dd>
+            </div>
+          </dl>
+          {f.diasSemRota > 0 && <p className="mt-2 text-xs text-gema-200">{f.diasSemRota} dia(s) com entrega sem rota gerada: o combustível desses dias não entrou. Gere em Rotas.</p>}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {[
+            ["Recebido", reais(f.recebido), `${num(f.recebimentos)} pagamentos no período`],
+            ["A receber hoje", reais(f.aReceber), f.vencido ? `${reais(f.vencido)} vencido` : "nada vencido"],
+            ["Entregas", num(f.entregas), `${cx(t.caixas)} entregues`],
+            ["Km rodados", km(f.km), f.km ? `${reais(f.combustivel / f.km)} por km` : "gere as rotas"],
+            ["Combustível por caixa", t.caixas && f.combustivel ? reais(f.combustivel / t.caixas) : "—", "gasolina ÷ caixas"],
+            ["Atendimentos", num(f.atendimentos), f.atendimentosAbertos ? `${num(f.atendimentosAbertos)} ainda abertos` : "todos resolvidos"],
+          ].map(([rotulo, valor, sub], n) => (
+            <div key={rotulo} className={`rounded-xl bg-white/10 p-3 ${n === 1 && f.vencido ? "ring-2 ring-red-300" : ""}`}>
+              <p className="text-xs uppercase tracking-wide text-marca-200">{rotulo}</p>
+              <p className="tabular text-lg font-bold">{valor}</p>
+              <p className="text-xs text-marca-100">{sub}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6 [&>*]:min-w-0">
         <Bloco rotulo="Faturamento" valor={reais(t.faturamento)}>
@@ -249,6 +288,123 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
       </section>
 
       <section className="mt-6 grid gap-6 xl:grid-cols-[3fr_2fr] [&>*]:min-w-0">
+        <div className="cartao p-5">
+          <h2 className="font-semibold text-marca-950">Vendas por tipo de negócio</h2>
+          <p className="mt-1 text-xs text-stone-500">Restaurantes, lancherias, padarias e confeitarias: quem fatura e quem dá lucro.</p>
+          {r.porTipo.length ? (
+            <GraficoVendas
+              horizontal
+              altura={Math.max(160, r.porTipo.length * 56)}
+              dados={r.porTipo.map((g) => ({ rotulo: g.nome, faturamento: Math.round(g.faturamento), custo: Math.round(g.custo), lucro: Math.round(g.lucro), semCusto: Math.round(g.semCusto) }))}
+            />
+          ) : (
+            <Vazio>Nenhuma venda no período.</Vazio>
+          )}
+          <ul className="mt-2 divide-y divide-stone-100 text-sm">
+            {r.porTipo.map((g) => (
+              <li key={g.nome} className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5">
+                <span className="font-medium">{g.nome}</span>
+                <span className="tabular text-stone-600">
+                  {num(g.pedidos)} pedidos · {cx(g.caixas)} · {t.faturamento ? pct(g.faturamento / t.faturamento) : "—"} do faturamento
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="grid content-start gap-6 [&>*]:min-w-0">
+          {[
+            { titulo: "Com NF × sem NF", sub: "Pela nota de cada pedido.", grupos: r.porNota },
+            { titulo: "À vista × a prazo", sub: "Pela condição de pagamento do cliente.", grupos: r.porCondicao },
+          ].map(({ titulo, sub, grupos }) => (
+            <div key={titulo} className="cartao p-5">
+              <h2 className="font-semibold text-marca-950">{titulo}</h2>
+              <p className="mt-1 text-xs text-stone-500">{sub}</p>
+              {grupos.length ? (
+                <>
+                  {/* Barra de participação no faturamento */}
+                  <div className="mt-4 flex h-3 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+                    {grupos.map((g, i) => (
+                      <span key={g.nome} style={{ width: `${(g.faturamento / (t.faturamento || 1)) * 100}%`, background: i ? "#c9bfb3" : COR_LUCRO }} />
+                    ))}
+                  </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-4">
+                    {grupos.map((g, i) => (
+                      <div key={g.nome}>
+                        <dt className="flex items-center gap-1.5 text-xs font-medium text-stone-500">
+                          <span className="size-2.5 rounded-sm" style={{ background: i ? "#c9bfb3" : COR_LUCRO }} aria-hidden />
+                          {g.nome} · {t.faturamento ? pct(g.faturamento / t.faturamento) : "—"}
+                        </dt>
+                        <dd className="tabular text-xl font-bold">{reais(g.faturamento)}</dd>
+                        <dd className="tabular text-xs text-stone-500">
+                          lucro {reais(g.lucro)} · {num(g.pedidos)} pedidos
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-stone-500">Nenhuma venda no período.</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6 cartao overflow-x-auto">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-5">
+          <h2 className="font-semibold text-marca-950">Logística: km e combustível da Fiorino</h2>
+          <Link href={`/painel/rotas?dia=${r.inicio}`} className="text-sm text-marca-700 hover:underline print:hidden">Abrir rotas →</Link>
+        </div>
+        <table className="mt-3 w-full text-sm">
+          <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
+            <tr>
+              <th className="px-4 py-2">Dia</th>
+              <th className="px-4 py-2 text-right">Entregas</th>
+              <th className="px-4 py-2 text-right">Caixas</th>
+              <th className="px-4 py-2 text-right">Km</th>
+              <th className="px-4 py-2 text-right">Litros</th>
+              <th className="px-4 py-2 text-right">Combustível</th>
+              <th className="px-4 py-2 text-right">Por caixa</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-stone-100">
+            {r.logistica.map((l) => (
+              <tr key={l.dia}>
+                <td className="px-4 py-2.5 first-letter:uppercase">{formatarDia(l.dia, { weekday: "short", day: "2-digit", month: "2-digit" })}</td>
+                <td className="tabular px-4 py-2.5 text-right">{num(l.entregas)}</td>
+                <td className="tabular px-4 py-2.5 text-right">{cx(l.caixas)}</td>
+                <td className="tabular px-4 py-2.5 text-right">
+                  {km(l.km)}
+                  {!l.real && <span className="text-xs text-stone-400"> calc.</span>}
+                </td>
+                <td className="tabular px-4 py-2.5 text-right">{litros(l.litros)}</td>
+                <td className="tabular px-4 py-2.5 text-right font-semibold">{reais(l.custo)}</td>
+                <td className="tabular px-4 py-2.5 text-right">{l.caixas ? reais(l.custo / l.caixas) : "—"}</td>
+              </tr>
+            ))}
+            {r.logistica.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-6 text-center text-stone-500">Nenhuma rota gerada no período. Em Rotas, gere a rota de cada dia de entrega.</td>
+              </tr>
+            )}
+          </tbody>
+          {r.logistica.length > 1 && (
+            <tfoot className="border-t border-stone-200 font-semibold">
+              <tr>
+                <td className="px-4 py-2.5">Total</td>
+                <td className="tabular px-4 py-2.5 text-right">{num(r.logistica.reduce((s, l) => s + l.entregas, 0))}</td>
+                <td className="tabular px-4 py-2.5 text-right">{cx(r.logistica.reduce((s, l) => s + l.caixas, 0))}</td>
+                <td className="tabular px-4 py-2.5 text-right">{km(f.km)}</td>
+                <td className="tabular px-4 py-2.5 text-right">{litros(f.litros)}</td>
+                <td className="tabular px-4 py-2.5 text-right">{reais(f.combustivel)}</td>
+                <td className="px-4 py-2.5" />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </section>
+
+      <section className="mt-6 grid gap-6 xl:grid-cols-[3fr_2fr] [&>*]:min-w-0">
         <div className="cartao overflow-x-auto">
           <h2 className="px-5 pt-5 font-semibold text-marca-950">Quem mais comprou</h2>
           <table className="mt-3 w-full text-sm">
@@ -265,7 +421,10 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
             <tbody className="divide-y divide-stone-100">
               {r.porCliente.map((c) => (
                 <tr key={c.nome}>
-                  <td className="px-4 py-2.5 font-medium">{c.nome}</td>
+                  <td className="px-4 py-2.5 font-medium">
+                    {c.nome}
+                    <span className="block text-xs font-normal text-stone-500">{c.tipo} · {c.notaFiscal ? "com NF" : "sem NF"}</span>
+                  </td>
                   <td className="tabular px-4 py-2.5 text-right">{num(c.pedidos)}</td>
                   <td className="tabular px-4 py-2.5 text-right">{cx(c.caixas)}</td>
                   <td className="tabular px-4 py-2.5 text-right">{reais(c.faturamento)}</td>

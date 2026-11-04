@@ -23,7 +23,7 @@ Na primeira vez, os dois criam o `.env` (com uma chave de sessão nova) e o banc
 
 | Quem | Entra com | Senha | Vai pra |
 |---|---|---|---|
-| João Arthur (equipe) | joao@santimelo.local | `senha123` | Painel |
+| João Arthur (teste) | adm123 (ou joao@santimelo.local) | `123` | Painel. Pela tela do app, entra no app como o cliente "Santimelo (teste)" |
 | Padaria Pão Quente | EGG-PADR | `ovos123` | App |
 | Confeitaria Doce Gema | EGG-DCGM | `ovos123` | App |
 | Smash Burger POA | EGG-SMSH | `ovos123` | App |
@@ -39,9 +39,12 @@ Trocar as senhas antes de colocar na nuvem.
   - destaque do melhor dia e do produto que mais deu lucro;
   - gráfico dia a dia com custo + lucro empilhados (a barra inteira é o faturamento);
   - lucro por produto e tabela com quantidade, custo unitário, faturamento, custo, lucro e margem de cada produto;
+  - vendas por tipo de negócio, com NF × sem NF e à vista × a prazo;
   - quem mais comprou e as compras de ovos do período.
 - **Pedidos:** por dia de entrega, com a lista do que separar. "Novo pedido" lança um pedido que chegou por WhatsApp ou telefone, já com o preço combinado do cliente.
-- **Clientes:** cadastro, acesso ao app (gera código `EGG-XXXX` e senha, com mensagem pronta pro WhatsApp), negociação, preço combinado, mensagens, destravar e senha nova.
+- **Atendimentos:** o que chegou pelo chat do Guinho, mais antigo primeiro, com botão de chamar o cliente no WhatsApp, "peguei esse" e "resolvido". Bolinha no menu com os abertos.
+- **Novo cliente** (Clientes → Novo cliente): 3 passos, CEP preenche o endereço e a região. Liberando o app, gera login a partir do nome (Padaria Pão Quente → PAOQUENTE) e senha de ovo (ex: gema4821), nenhum repetido, e o QR de acesso do cliente (abre o app com o login preenchido; também fica na ficha).
+- **Clientes:** cadastro (nome, razão social, CNPJ, tipo: restaurante, lancheria, padaria ou confeitaria, endereço, bairro, cidade de POA e região, à vista ou prazo, forma de pagamento, com ou sem NF), com ou sem app. A ficha mostra quanto comprou em 30 dias, caixas, ticket médio e em aberto. Acesso ao app (gera código `EGG-XXXX` e senha, com mensagem pronta pro WhatsApp), negociação, preço combinado, mensagens, destravar e senha nova.
 - **Preços:** preço de cada produto e mudança agendada (o cliente vê antes de valer).
 - **Entregas:** regiões, dias, horários e vagas.
 - **Cobranças:** em aberto, vencidas e marcar pago.
@@ -50,10 +53,12 @@ Trocar as senhas antes de colocar na nuvem.
 
 ## App (cliente)
 
-- **Início:** mensagens, próxima entrega, próximo pagamento e preço da caixa hoje.
+- **Início:** mensagens, próxima entrega, valor em aberto (toca e abre o Financeiro) e preço da caixa hoje.
+- **Financeiro** (`/eggs/financeiro`): valor em aberto, vencido, próximo vencimento, pedidos agendados, pago nos últimos 30 dias e o extrato por mês (cada pedido abre com itens, entrega, vencimento e pagamento). Filtro tudo / em aberto / pagos. Pedido ainda não entregue aparece como "agendado" e não soma no em aberto.
 - **Pedir:** ovos, dia e horário com vagas da região; botão verde "Fazer pedido" leva ao passo que falta.
 - **Pedido feito:** "Parabéns pela compra", data combinada e frete grátis; a comanda vai pro grupo EGGS-ADM.
 - **Pedidos, Preços, Agenda e Conta.**
+- **Ajuda (chat do Guinho):** botão flutuante. Funil de botões: pedidos, entrega/produto, pagamento, vendas, problema no app. O que dá pra resolver sozinho leva pra tela certa; o resto vira **atendimento** no painel (protocolo, setor, motivo, pedido e o que o cliente escreveu) e o cliente escolhe: abrir o WhatsApp da Santimelo com a mensagem pronta ou pedir que a equipe chame. O número fica em Painel → Aplicativo.
 - **Instalar no celular:** botão "Instalar" (iPhone: Compartilhar → Adicionar à Tela de Início; Android: Instalar app).
 - **Rodando no PC:** o celular precisa estar no mesmo Wi-Fi e o Windows precisa deixar o Node.js receber conexões (rede "Privada" e Node permitido no Firewall). Endereço: `http://<IP do PC>:3001/eggs`.
 

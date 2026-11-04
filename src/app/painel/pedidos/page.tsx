@@ -7,6 +7,8 @@ import { listaDeSeparacao } from "@/lib/consultas";
 import { db } from "@/lib/db";
 import { diaValido, fimDoDia, formatarDia, inicioDoDia } from "@/lib/datas";
 import { quantidade, reais } from "@/lib/formato";
+import { AtualizaSozinho } from "@/components/atualiza-sozinho";
+import { PedidosQueChegaram } from "./chegaram";
 
 export const metadata: Metadata = { title: "Pedidos" };
 
@@ -34,11 +36,14 @@ export default async function Pedidos({ searchParams }: PageProps<"/painel/pedid
   return (
     <>
       <Cabecalho titulo="Pedidos" subtitulo={`Entrega ${formatarDia(dia)} · ${pedidos.length} pedidos · ${reais(total)}`}>
+        <AtualizaSozinho segundos={20} />
         <SeletorDia dia={dia} rota={rota} />
         <Link href={`/painel/pedidos/novo?dia=${dia}`} className="botao-primario">
           <Plus className="size-4" /> Novo pedido
         </Link>
       </Cabecalho>
+
+      <PedidosQueChegaram />
 
       <nav className="mb-4 flex flex-wrap gap-2 text-sm">
         <Link href={`${rota}?dia=${dia}`} className={`etiqueta px-3 py-1 ${!filtroStatus ? "bg-marca-800 text-white" : "bg-white text-stone-600 ring-1 ring-stone-200"}`}>

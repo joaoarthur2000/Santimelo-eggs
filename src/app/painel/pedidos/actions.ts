@@ -10,6 +10,26 @@ import { sincronizarCobranca } from "@/lib/eggs";
 import { sincronizarBaixaDoPedido } from "@/lib/estoque";
 import { exigirPapel } from "@/lib/sessao";
 
+/** Mensagem no app do cliente a cada etapa: o app avisa com imagem, som e vibração (ver eggs/(app)/avisador.tsx) */
+async function avisarEtapaNoApp(id: number, status: string) {
+  const pedido = await db.pedido.findUnique({ where: { id }, include: { janela: true } });
+  if (!pedido) return;
+  const horario = pedido.janela ? ` entre ${pedido.janela.inicio} e ${pedido.janela.fim}` : "";
+  const textos: Record<string, string> = {
+    SEPARACAO: `🥚 Seu pedido #${id} está sendo separado agora!`,
+    ENTREGA: `🚚 Seu pedido #${id} saiu pra entrega! Chega hoje${horario}.`,
+    ENTREGUE: `✅ Pedido #${id} entregue. Obrigado pela preferência!`,
+  };
+  const texto = textos[status];
+  if (!texto) return;
+  const chave = `status:${id}:${status}`;
+  await db.mensagem.upsert({
+    where: { chave },
+    update: { texto, criadaEm: new Date(), lidaEm: null },
+    create: { chave, clienteId: pedido.clienteId, tipo: "STATUS", autor: "Santimelo", texto },
+  });
+}
+
 export async function mudarStatus(id: number, status: string) {
   const usuario = await exigirPapel("DIRETOR");
   if (!(status in STATUS_PEDIDO)) throw new Error("Status inválido");
@@ -17,7 +37,9 @@ export async function mudarStatus(id: number, status: string) {
   // Saiu pra entrega = baixa do estoque; voltou ou cancelou = desfaz
   await sincronizarBaixaDoPedido(id, usuario.nome);
   await sincronizarCobranca(id);
+  await avisarEtapaNoApp(id, status);
   revalidatePath("/painel", "layout");
+  revalidatePath("/eggs", "layout");
   revalidatePath("/painel/pedidos");
   revalidatePath(`/painel/pedidos/${id}`);
 }
@@ -46,8 +68,9 @@ export async function criarPedido(dados: NovoPedido): Promise<{ erro?: string }>
 
   // Preço sempre do banco, nunca do navegador: o combinado com o cliente ou o de tabela
   const ids = r.data.itens.map((i) => i.produtoId);
-  const [produtos, especiais] = await Promise.all([
+  const [produtos, cliente, especiais] = await Promise.all([
     db.produto.findMany({ where: { id: { in: ids }, ativo: true } }),
+    db.cliente.findUnique({ where: { id: r.data.clienteId }, select: { notaFiscal: true } }),
     db.precoCliente.findMany({ where: { clienteId: r.data.clienteId, produtoId: { in: ids } } }),
   ]);
   const preco = new Map(produtos.map((p) => [p.id, especiais.find((e) => e.produtoId === p.id)?.preco ?? p.preco]));
@@ -63,6 +86,7 @@ export async function criarPedido(dados: NovoPedido): Promise<{ erro?: string }>
     data: {
       clienteId: r.data.clienteId,
       origem: r.data.origem,
+      notaFiscal: cliente?.notaFiscal ?? false,
       observacao: r.data.observacao || null,
       dataEntrega: new Date(inicioDoDia(r.data.dia).getTime() + 8 * 3600 * 1000),
       total: Math.round(itens.reduce((s, i) => s + i.subtotal, 0) * 100) / 100,

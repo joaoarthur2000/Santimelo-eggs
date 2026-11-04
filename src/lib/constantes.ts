@@ -24,11 +24,23 @@ export const ORIGENS_PEDIDO = {
   WHATSAPP: "WhatsApp",
 } as const;
 
-export const TIPOS_NEGOCIO = ["Padaria", "Confeitaria", "Restaurante", "Lancheria", "Hamburgueria", "Mercado", "Hotel", "Outro"] as const;
+// A Santimelo vende só ovos (bandeja de 30 e caixa de 30 dúzias) pra esses 4 tipos de negócio, em Porto Alegre e região
+export const TIPOS_NEGOCIO = ["Restaurante", "Lancheria", "Padaria", "Confeitaria"] as const;
+
+export const CIDADES = [
+  "Porto Alegre", "Canoas", "Cachoeirinha", "Gravataí", "Alvorada", "Viamão", "Esteio", "Sapucaia do Sul",
+  "São Leopoldo", "Novo Hamburgo", "Guaíba", "Eldorado do Sul",
+] as const;
+
+/** Condição de pagamento: 0 = à vista (na entrega); o resto é prazo em dias depois da entrega */
+export const PRAZOS_PAGAMENTO = [0, 7, 14, 21, 28, 30] as const;
+export const FORMAS_PAGAMENTO = ["Pix", "Dinheiro", "Boleto", "Cartão", "Transferência"] as const;
+export const condicaoPagamento = (prazo: number | null | undefined) => (prazo ? `A prazo · ${prazo} dias` : "À vista");
 
 export const UNIDADES: Record<string, string> = {
   bandeja: "bdj",
   caixa: "cx",
+  pacote: "pct", // plastificado de 20 ovos
 };
 
 // Extrato do estoque (MovimentoEstoque.tipo)

@@ -5,6 +5,7 @@ import { diaDaSemana, diaISO, fimDoDia, formatarDia, inicioDoDia, somarDias } fr
 import { db } from "./db";
 import { custosMedios } from "./estoque";
 import { nomeProduto } from "./formato";
+import { custoDaRota } from "./rota";
 
 // Relatório de vendas de ovos (pela data de entrega, pedidos não cancelados).
 // Custo de um item vendido = caixas equivalentes × custo médio das compras até o fim do período.
@@ -61,18 +62,33 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
   const faixa = intervalo(periodo, dia);
   const ant = periodoAnterior(periodo, faixa.inicio);
   const comeco = [faixa.inicio, faixa.faixas[0].inicio, ant.inicio].sort()[0];
-  const [pedidos, custo, custoAnterior, compras] = await Promise.all([
+  const [pedidos, custo, custoAnterior, compras, recebidas, emAberto, rotas, atendimentos] = await Promise.all([
     pedidosNoPeriodo(comeco, faixa.fim),
     custosMedios(fimDoDia(faixa.fim)),
     custosMedios(fimDoDia(ant.fim)),
     db.movimentoEstoque.findMany({ where: { tipo: "COMPRA", data: { gte: inicioDoDia(faixa.inicio), lt: fimDoDia(faixa.fim) } } }),
+    // Fechamento: dinheiro que entrou, o que falta receber (hoje), combustível e atendimentos do período
+    db.cobranca.findMany({ where: { pagoEm: { gte: inicioDoDia(faixa.inicio), lt: fimDoDia(faixa.fim) } } }),
+    db.cobranca.findMany({ where: { pagoEm: null } }),
+    db.rotaDia.findMany({ where: { dia: { gte: faixa.inicio, lte: faixa.fim } }, orderBy: { dia: "asc" } }),
+    db.atendimento.findMany({ where: { criadoEm: { gte: inicioDoDia(faixa.inicio), lt: fimDoDia(faixa.fim) } }, select: { setor: true, status: true } }),
   ]);
 
   const total = zero();
   const anterior = zero();
   const porFaixa = new Map(faixa.faixas.map((f) => [f.chave, zero()]));
   const porProduto = new Map<string, Soma & { nome: string; codigo: string | null; ordem: number; unidade: string; quantidade: number; custoUnit: number | null }>();
-  const porCliente = new Map<string, Soma & { nome: string; pedidos: number }>();
+  const porCliente = new Map<string, Soma & { nome: string; tipo: string; notaFiscal: boolean; pedidos: number }>();
+  // Recortes: tipo de negócio, com/sem NF, à vista/a prazo
+  type Grupo = Soma & { nome: string; pedidos: number };
+  const porTipo = new Map<string, Grupo>();
+  const porNota = new Map<string, Grupo>();
+  const porCondicao = new Map<string, Grupo>();
+  const grupo = (mapa: Map<string, Grupo>, nome: string) => {
+    const g = mapa.get(nome) ?? { ...zero(), nome, pedidos: 0 };
+    mapa.set(nome, g);
+    return g;
+  };
   const idsPeriodo = new Set<number>();
   const idsAnterior = new Set<number>();
 
@@ -112,13 +128,38 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
       somar(prod, custo);
       porProduto.set(i.produtoId, prod);
 
-      const cli = porCliente.get(p.clienteId) ?? { ...zero(), nome: p.cliente.nomeFantasia, pedidos: 0 };
+      const cli = porCliente.get(p.clienteId) ?? { ...zero(), nome: p.cliente.nomeFantasia, tipo: p.cliente.tipoNegocio, notaFiscal: p.cliente.notaFiscal, pedidos: 0 };
       somar(cli, custo);
       porCliente.set(p.clienteId, cli);
+      somar(grupo(porTipo, p.cliente.tipoNegocio), custo);
+      somar(grupo(porNota, p.notaFiscal ? "Com NF" : "Sem NF"), custo);
+      somar(grupo(porCondicao, p.cliente.prazoPagamentoDias ? "A prazo" : "À vista"), custo);
     }
     const cli = porCliente.get(p.clienteId);
-    if (noPeriodo && cli) cli.pedidos += 1;
+    if (noPeriodo && cli) {
+      cli.pedidos += 1;
+      grupo(porTipo, p.cliente.tipoNegocio).pedidos += 1;
+      grupo(porNota, p.notaFiscal ? "Com NF" : "Sem NF").pedidos += 1;
+      grupo(porCondicao, p.cliente.prazoPagamentoDias ? "A prazo" : "À vista").pedidos += 1;
+    }
   }
+
+  // Entregas = paradas (cliente por dia), pedidos não cancelados do período
+  const paradas = new Map<string, { dia: string; caixas: number }>();
+  for (const p of pedidos) {
+    const d = diaISO(p.dataEntrega);
+    if (d < faixa.inicio || d > faixa.fim) continue;
+    const k = `${d}|${p.clienteId}`;
+    const x = paradas.get(k) ?? { dia: d, caixas: 0 };
+    x.caixas += p.itens.reduce((t, i) => t + i.quantidade * (i.produto.fatorEstoque ?? 0), 0);
+    paradas.set(k, x);
+  }
+  const logistica = rotas.map((rt) => {
+    const c = custoDaRota(rt);
+    const doDia = [...paradas.values()].filter((x) => x.dia === rt.dia);
+    return { dia: rt.dia, entregas: doDia.length, caixas: doDia.reduce((t, x) => t + x.caixas, 0), ...c };
+  });
+  const combustivel = logistica.reduce((t, l) => t + l.custo, 0);
 
   const comLucro = <T extends Soma>(s: T) => ({ ...s, lucro: lucroDe(s), margem: s.faturamento - s.semCusto > 0 ? lucroDe(s) / (s.faturamento - s.semCusto) : null });
   const caixasCompradas = compras.reduce((s, m) => s + m.quantidade, 0);
@@ -135,6 +176,24 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
     }),
     porProduto: [...porProduto.values()].map(comLucro).sort((a, b) => a.ordem - b.ordem || b.faturamento - a.faturamento),
     porCliente: [...porCliente.values()].map(comLucro).sort((a, b) => b.faturamento - a.faturamento),
+    fechamento: {
+      recebido: recebidas.reduce((t, c) => t + c.valor, 0),
+      recebimentos: recebidas.length,
+      aReceber: emAberto.reduce((t, c) => t + c.valor, 0),
+      vencido: emAberto.filter((c) => c.vencimento < diaISO()).reduce((t, c) => t + c.valor, 0),
+      entregas: paradas.size,
+      diasSemRota: new Set([...paradas.values()].map((x) => x.dia).filter((d) => !rotas.some((rt) => rt.dia === d))).size,
+      km: logistica.reduce((t, l) => t + l.km, 0),
+      litros: logistica.reduce((t, l) => t + l.litros, 0),
+      combustivel,
+      lucroLiquido: lucroDe(total) - combustivel,
+      atendimentos: atendimentos.length,
+      atendimentosAbertos: atendimentos.filter((x) => x.status !== "RESOLVIDO").length,
+    },
+    logistica,
+    porTipo: [...porTipo.values()].map(comLucro).sort((a, b) => b.faturamento - a.faturamento),
+    porNota: [...porNota.values()].map(comLucro).sort((a, b) => a.nome.localeCompare(b.nome)),
+    porCondicao: [...porCondicao.values()].map(comLucro).sort((a, b) => b.nome.localeCompare(a.nome)),
   };
 }
 

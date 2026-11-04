@@ -1,19 +1,20 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { DIAS_SEMANA } from "@/lib/constantes";
+import { CIDADES, DIAS_SEMANA, FORMAS_PAGAMENTO, PRAZOS_PAGAMENTO, TIPOS_NEGOCIO } from "@/lib/constantes";
 import {
   agendarPreco,
   avisarTodos,
   criarJanela,
   criarRegiao,
-  darAcesso,
+  liberarApp,
   enviarMensagem,
   novaSenha,
   salvarCondicoes,
   salvarDados,
   salvarManutencao,
   salvarNovidades,
+  salvarWhatsappAtendimento,
   testarWhatsapp,
 } from "./actions";
 
@@ -37,14 +38,14 @@ function Retorno({ estado, salvo = "Salvo." }: { estado: Estado; salvo?: string 
 /** Código e senha gerados: aparecem uma vez só pra passar pro cliente */
 function AcessoGerado({ estado, linkApp }: { estado: Estado; linkApp: string }) {
   if (!estado.senha) return null;
-  const mensagem = `Olá! Seu acesso ao app EGGS da Santimelo:\n${linkApp}\nCódigo: ${estado.codigo}\nSenha: ${estado.senha}`;
+  const mensagem = `Olá! 🥚 Seu acesso ao app EGGS, da Santimelo:\n${linkApp}\n\nLogin: ${estado.codigo}\nSenha: ${estado.senha}\n\nBons pedidos! 🐣`;
   return (
     <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
       <p className="font-semibold">Passe pro cliente (a senha não aparece de novo):</p>
       <p className="mt-1">
         App: <b>{linkApp}</b>
         <br />
-        Código: <b className="font-mono text-base tracking-wider">{estado.codigo}</b>
+        Login: <b className="font-mono text-base tracking-wider">{estado.codigo}</b>
         <br />
         Senha: <b className="font-mono text-base tracking-wider">{estado.senha}</b>
       </p>
@@ -64,6 +65,8 @@ type Dados = {
   whatsapp: string | null;
   email: string | null;
   endereco: string | null;
+  bairro: string | null;
+  cidade: string | null;
   cep: string | null;
   consumoSemanal: number | null;
   limiteCredito: number | null;
@@ -97,8 +100,14 @@ function CamposDados({ inicial }: { inicial?: Partial<Dados> }) {
         <input name="whatsapp" required inputMode="tel" defaultValue={v(inicial?.whatsapp)} placeholder="(51) 99999-9999" className="campo mt-1" />
       </label>
       <label className={rotulo}>
-        Tipo de negócio
-        <input name="tipoNegocio" defaultValue={v(inicial?.tipoNegocio)} placeholder="Padaria, confeitaria…" className="campo mt-1" />
+        Tipo de negócio *
+        <select name="tipoNegocio" required defaultValue={inicial?.tipoNegocio ?? ""} className="campo mt-1">
+          <option value="" disabled>Escolha…</option>
+          {TIPOS_NEGOCIO.map((t) => (
+            <option key={t}>{t}</option>
+          ))}
+          {inicial?.tipoNegocio && !(TIPOS_NEGOCIO as readonly string[]).includes(inicial.tipoNegocio) && <option>{inicial.tipoNegocio}</option>}
+        </select>
       </label>
       <label className={rotulo}>
         E-mail
@@ -106,7 +115,20 @@ function CamposDados({ inicial }: { inicial?: Partial<Dados> }) {
       </label>
       <label className={`${rotulo} col-span-2`}>
         Endereço de entrega *
-        <input name="endereco" required defaultValue={v(inicial?.endereco)} placeholder="Rua, número, complemento, bairro" className="campo mt-1" />
+        <input name="endereco" required defaultValue={v(inicial?.endereco)} placeholder="Rua, número e complemento" className="campo mt-1" />
+      </label>
+      <label className={rotulo}>
+        Bairro *
+        <input name="bairro" required defaultValue={v(inicial?.bairro)} className="campo mt-1" />
+      </label>
+      <label className={rotulo}>
+        Cidade *
+        <input name="cidade" required list="cidades-dados" defaultValue={inicial?.cidade ?? "Porto Alegre"} className="campo mt-1" />
+        <datalist id="cidades-dados">
+          {CIDADES.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
       </label>
       <label className={rotulo}>
         CEP
@@ -128,12 +150,12 @@ function CamposDados({ inicial }: { inicial?: Partial<Dados> }) {
   );
 }
 
-type Condicoes = { regiaoId: string | null; prazoPagamentoDias: number | null; formaPagamento: string | null; negociacao: string | null };
+type Condicoes = { regiaoId: string | null; prazoPagamentoDias: number | null; formaPagamento: string | null; notaFiscal: boolean; negociacao: string | null };
 
 function CamposCondicoes({ regioes, inicial }: { regioes: Regiao[]; inicial?: Condicoes }) {
   return (
     <>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <label className="text-xs text-stone-500">
           Região de entrega
           <select name="regiaoId" defaultValue={inicial?.regiaoId ?? ""} className="campo mt-1">
@@ -144,44 +166,45 @@ function CamposCondicoes({ regioes, inicial }: { regioes: Regiao[]; inicial?: Co
           </select>
         </label>
         <label className="text-xs text-stone-500">
-          Prazo (dias)
-          <input name="prazoPagamentoDias" inputMode="numeric" defaultValue={inicial?.prazoPagamentoDias ?? ""} placeholder="0 = na entrega" className="campo mt-1" />
+          Condição
+          <select name="prazoPagamentoDias" defaultValue={String(inicial?.prazoPagamentoDias ?? 0)} className="campo mt-1">
+            {PRAZOS_PAGAMENTO.map((d) => (
+              <option key={d} value={d}>{d ? `A prazo · ${d} dias` : "À vista (na entrega)"}</option>
+            ))}
+            {!!inicial?.prazoPagamentoDias && !(PRAZOS_PAGAMENTO as readonly number[]).includes(inicial.prazoPagamentoDias) && (
+              <option value={inicial.prazoPagamentoDias}>A prazo · {inicial.prazoPagamentoDias} dias</option>
+            )}
+          </select>
         </label>
         <label className="text-xs text-stone-500">
-          Pagamento
-          <input name="formaPagamento" defaultValue={inicial?.formaPagamento ?? ""} placeholder="Pix, boleto…" className="campo mt-1" />
+          Forma de pagamento
+          <select name="formaPagamento" defaultValue={inicial?.formaPagamento ?? "Pix"} className="campo mt-1">
+            {FORMAS_PAGAMENTO.map((f) => (
+              <option key={f}>{f}</option>
+            ))}
+            {inicial?.formaPagamento && !(FORMAS_PAGAMENTO as readonly string[]).includes(inicial.formaPagamento) && <option>{inicial.formaPagamento}</option>}
+          </select>
         </label>
+        <fieldset className="text-xs text-stone-500">
+          <legend>Nota fiscal</legend>
+          <div className="mt-1 grid grid-cols-2 overflow-hidden rounded-lg ring-1 ring-stone-300">
+            {[
+              ["1", "Com NF"],
+              ["0", "Sem NF"],
+            ].map(([valor, rotulo]) => (
+              <label key={valor} className="cursor-pointer text-center text-stone-700 has-[:checked]:bg-marca-900 has-[:checked]:text-white">
+                <input type="radio" name="notaFiscal" value={valor} defaultChecked={(inicial?.notaFiscal ? "1" : "0") === valor} className="sr-only" />
+                <span className="block px-2 py-2 text-sm font-medium">{rotulo}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
       </div>
       <label className="block text-xs text-stone-500">
         O que foi combinado (aparece pro cliente)
         <textarea name="negociacao" rows={2} defaultValue={inicial?.negociacao ?? ""} placeholder="Ex: mínimo de 1 caixa por pedido; troca de ovos trincados na próxima entrega" className="campo mt-1" />
       </label>
     </>
-  );
-}
-
-export function FormDarAcesso({ regioes, clientes, linkApp }: { regioes: Regiao[]; clientes: { id: string; nome: string }[]; linkApp: string }) {
-  const [estado, acao, enviando] = useActionState<Estado, FormData>(darAcesso, {});
-  const [clienteId, setClienteId] = useState("");
-  const ref = useLimpar(estado.ok);
-  return (
-    <form ref={ref} action={acao} className="space-y-3">
-      <label className="block text-xs text-stone-500">
-        Cliente
-        <select name="clienteId" value={clienteId} onChange={(e) => setClienteId(e.target.value)} className="campo mt-1">
-          <option value="">Novo cliente (só ovos)</option>
-          {clientes.map((c) => (
-            <option key={c.id} value={c.id}>Já cadastrado: {c.nome}</option>
-          ))}
-        </select>
-      </label>
-      {!clienteId && <CamposDados />}
-      <h3 className="pt-1 text-sm font-semibold text-marca-950">Negociação</h3>
-      <CamposCondicoes regioes={regioes} />
-      <button disabled={enviando} className="botao-primario w-full">Liberar acesso e gerar código</button>
-      <Retorno estado={estado} />
-      <AcessoGerado estado={estado} linkApp={linkApp} />
-    </form>
   );
 }
 
@@ -207,6 +230,17 @@ export function FormCondicoes({ clienteId, regioes, inicial }: { clienteId: stri
         <button disabled={enviando} className="botao-primario">Salvar negociação</button>
         <Retorno estado={estado} />
       </div>
+    </form>
+  );
+}
+
+export function BotaoLiberarApp({ clienteId, linkApp }: { clienteId: string; linkApp: string }) {
+  const [estado, acao, enviando] = useActionState<Estado, FormData>(liberarApp.bind(null, clienteId), {});
+  return (
+    <form action={acao} className="space-y-3">
+      {!estado.senha && <button disabled={enviando} className="botao-primario">🥚 Liberar o app</button>}
+      <Retorno estado={estado} />
+      <AcessoGerado estado={estado} linkApp={linkApp} />
     </form>
   );
 }
@@ -379,5 +413,18 @@ export function BotaoCopiar({ texto }: { texto: string }) {
     >
       {copiado ? "Copiado!" : "Copiar mensagem"}
     </button>
+  );
+}
+
+export function FormWhatsappAtendimento({ numero }: { numero: string }) {
+  const [estado, acao, enviando] = useActionState<Estado, FormData>(salvarWhatsappAtendimento, {});
+  return (
+    <form action={acao} className="space-y-2">
+      <input name="numero" inputMode="tel" defaultValue={numero} placeholder="(51) 99999-9999" className="campo" />
+      <div className="flex items-center gap-3">
+        <button disabled={enviando} className="botao-secundario">Salvar número</button>
+        <Retorno estado={estado} />
+      </div>
+    </form>
   );
 }

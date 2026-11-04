@@ -1,7 +1,7 @@
-// Logo do app EGGS: ícone com o Guinho (o mesmo de public/eggs/icone.svg) + nome
+// Logo do app EGGS: símbolo da Santimelo (o mesmo ícone da tela do celular, public/eggs/icone.svg) + nome
 export function IconeEggs({ className = "size-9" }: { className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/eggs/icone.svg" alt="" aria-hidden className={className} />;
+  return <img src="/eggs/icone.svg?v=2" alt="" aria-hidden className={className} />;
 }
 
 export function MarcaEggs({ grande = false }: { grande?: boolean }) {

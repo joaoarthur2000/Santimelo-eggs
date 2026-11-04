@@ -9,11 +9,14 @@ import { criarSessao, encerrarSessao } from "@/lib/sessao";
 const TENTATIVAS = 5;
 const BLOQUEIO_MS = 15 * 60 * 1000;
 
-/** Entra com e-mail (equipe) ou código de acesso (cliente do app, ex: EGG-7K3P). 5 senhas erradas bloqueiam 15 min */
+/**
+ * Entra com e-mail ou código de acesso (cliente do app, ex: EGG-7K3P; equipe também pode ter, ex: ADM123).
+ * Pela tela do app, quem tem cliente vinculado vai pro app; senão o papel decide. 5 senhas erradas bloqueiam 15 min
+ */
 export async function entrar(_estado: { erro?: string }, form: FormData): Promise<{ erro?: string }> {
   const login = String(form.get("email") ?? "").trim();
   const senha = String(form.get("senha") ?? "");
-  const porCodigo = /^egg-/i.test(login);
+  const porCodigo = !login.includes("@");
   const erroPadrao = porCodigo ? "Código ou senha incorretos." : "E-mail ou senha incorretos.";
 
   const usuario = await db.usuario.findUnique({ where: porCodigo ? { codigoAcesso: login.toUpperCase() } : { email: login.toLowerCase() } });
@@ -32,6 +35,7 @@ export async function entrar(_estado: { erro?: string }, form: FormData): Promis
   if (usuario.falhas || usuario.bloqueadoAte) await db.usuario.update({ where: { id: usuario.id }, data: { falhas: 0, bloqueadoAte: null } });
 
   await criarSessao(usuario.id);
+  if (form.get("tema") === "eggs" && usuario.clienteId) redirect("/eggs");
   redirect(INICIO_DO_PAPEL[usuario.papel as Papel] ?? "/painel");
 }
 

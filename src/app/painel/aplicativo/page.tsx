@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { textoPedidoGrupo } from "@/lib/eggs";
 import { linkDoApp } from "@/lib/rede";
 import { ULTIMO_ENVIO, whatsappConectado } from "@/lib/whatsapp";
-import { BotaoCopiar, BotaoTesteWhatsapp, FormAvisoTodos, FormManutencao, FormNovidades } from "../forms";
+import { BotaoCopiar, BotaoTesteWhatsapp, FormAvisoTodos, FormManutencao, FormNovidades, FormWhatsappAtendimento } from "../forms";
 
 export const metadata: Metadata = { title: "Aplicativo EGGS" };
 
@@ -19,7 +19,7 @@ const minutosDesde = (d: Date) => (Date.now() - d.getTime()) / 60000;
 export default async function AplicativoEggs() {
   const link = linkDoApp();
   const versao = versaoDoApp();
-  const [qr, manutencao, manutencaoTexto, novidades, clientes, ultimoEnvio, ultimoPedido] = await Promise.all([
+  const [qr, manutencao, manutencaoTexto, novidades, clientes, ultimoEnvio, ultimoPedido, whatsAtendimento] = await Promise.all([
     QRCode.toString(link, { type: "svg", margin: 1, color: { dark: "#3d2614", light: "#ffffff" } }),
     lerConfig(CONFIG.MANUTENCAO),
     lerConfig(CONFIG.MANUTENCAO_TEXTO),
@@ -27,6 +27,7 @@ export default async function AplicativoEggs() {
     db.cliente.findMany({ include: { usuario: true }, orderBy: { nomeFantasia: "asc" } }),
     lerConfig(ULTIMO_ENVIO),
     db.pedido.findFirst({ where: { origem: "APP" }, orderBy: { id: "desc" }, select: { id: true } }),
+    lerConfig(CONFIG.WHATSAPP_ATENDIMENTO),
   ]);
   const whatsapp = whatsappConectado();
   const envio = ultimoEnvio ? (JSON.parse(ultimoEnvio) as { em: string; ok: boolean; erro?: string }) : null;
@@ -102,6 +103,15 @@ export default async function AplicativoEggs() {
                 </div>
               </>
             )}
+          </section>
+
+          <section className={`cartao p-5 ${whatsAtendimento ? "" : "ring-2 ring-amber-300"}`}>
+            <h2 className="mb-1 font-semibold text-marca-950">WhatsApp do atendimento</h2>
+            <p className="mb-3 text-xs text-stone-500">
+              Número da Santimelo que o chat do Guinho (aba Ajuda do app) abre no WhatsApp, com o assunto já escrito.
+              {!whatsAtendimento && " Sem número, o cliente só consegue pedir que a equipe chame."}
+            </p>
+            <FormWhatsappAtendimento numero={whatsAtendimento ?? ""} />
           </section>
 
           <section className="cartao p-5">

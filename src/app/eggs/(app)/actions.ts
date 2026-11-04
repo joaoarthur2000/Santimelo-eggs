@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
+import { ASSUNTOS, CONTATOS, SETORES } from "@/lib/chat";
 import { DIAS_SEMANA } from "@/lib/constantes";
 import { diaDaSemana, diaISO, fimDoDia, formatarDia, inicioDoDia, somarDias } from "@/lib/datas";
 import { db } from "@/lib/db";
@@ -62,6 +63,7 @@ export async function fazerPedido(dados: z.infer<typeof esquemaPedido>): Promise
     data: {
       clienteId: cliente.id,
       origem: "APP",
+      notaFiscal: cliente.notaFiscal,
       janelaId,
       observacao,
       dataEntrega: new Date(inicioDoDia(dia).getTime() + (h * 60 + m) * 60 * 1000),
@@ -100,4 +102,73 @@ export async function marcarMensagensLidas() {
   const { cliente } = await exigirCliente();
   await db.mensagem.updateMany({ where: { clienteId: cliente.id, lidaEm: null }, data: { lidaEm: new Date() } });
   atualizar();
+}
+
+const esquemaAtendimento = z.object({
+  assunto: z.string(),
+  motivo: z.string(),
+  pedidoId: z.number().int().nullable(),
+  detalhe: z.string().max(600).nullable(),
+  contato: z.enum(["WHATSAPP", "RETORNO", "CHAT"]),
+});
+
+/** Chat do Guinho: vira atendimento no painel (protocolo) e avisa o grupo EGGS-ADM */
+export async function abrirAtendimento(dados: z.infer<typeof esquemaAtendimento>): Promise<{ erro?: string; protocolo?: number }> {
+  const { cliente } = await exigirCliente();
+  const r = esquemaAtendimento.safeParse(dados);
+  if (!r.success) return { erro: "Não deu pra enviar. Tenta de novo." };
+  const assunto = ASSUNTOS.find((a) => a.id === r.data.assunto);
+  if (!assunto || !assunto.opcoes.some((o) => o.rotulo === r.data.motivo)) return { erro: "Assunto inválido." };
+  const pedido = r.data.pedidoId ? await db.pedido.findFirst({ where: { id: r.data.pedidoId, clienteId: cliente.id } }) : null;
+
+  const atendimento = await db.atendimento.create({
+    data: {
+      clienteId: cliente.id,
+      setor: assunto.setor,
+      motivo: r.data.motivo,
+      detalhe: r.data.detalhe?.trim() || null,
+      pedidoId: pedido?.id ?? null,
+      contato: r.data.contato,
+    },
+  });
+  if (atendimento.contato === "CHAT") {
+    await db.mensagemAtendimento.create({
+      data: {
+        atendimentoId: atendimento.id,
+        de: "EQUIPE",
+        autor: "Guinho",
+        lidaEm: new Date(),
+        texto: `Recebido! Protocolo #${atendimento.id}. Já passei pro pessoal de ${SETORES[assunto.setor]}, a resposta chega aqui mesmo (e eu te aviso). 🥚`,
+      },
+    });
+  }
+  revalidatePath("/painel", "layout");
+  after(() =>
+    enviarProGrupo(
+      [
+        `🆘 *ATENDIMENTO #${atendimento.id}* · ${SETORES[assunto.setor]}`,
+        `*Cliente:* ${cliente.nomeFantasia} (${cliente.responsavel ?? "—"}, ${cliente.whatsapp ?? "sem WhatsApp"})`,
+        `*Motivo:* ${atendimento.motivo}${pedido ? ` · pedido #${pedido.id}` : ""}`,
+        atendimento.detalhe ? `*Disse:* ${atendimento.detalhe}` : null,
+        `*Contato:* ${CONTATOS[atendimento.contato as keyof typeof CONTATOS]}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    ),
+  );
+  return { protocolo: atendimento.id };
+}
+
+/** Cliente responde no chat do atendimento. Se estava resolvido, reabre */
+export async function responderAtendimento(id: number, form: FormData) {
+  const { cliente, usuario } = await exigirCliente();
+  const t = String(form.get("texto") ?? "").trim().slice(0, 1000);
+  const a = await db.atendimento.findUnique({ where: { id } });
+  if (!t || !a || a.clienteId !== cliente.id) return;
+  await db.mensagemAtendimento.create({ data: { atendimentoId: id, de: "CLIENTE", autor: usuario.nome.split(" ")[0], texto: t } });
+  if (a.status === "RESOLVIDO") await db.atendimento.update({ where: { id }, data: { status: "ABERTO", resolvidoEm: null } });
+  revalidatePath("/painel", "layout");
+  revalidatePath(`/eggs/ajuda/${id}`);
+  after(() => enviarProGrupo(`💬 *Atendimento #${id}* · ${cliente.nomeFantasia} respondeu no app:
+${t}`));
 }

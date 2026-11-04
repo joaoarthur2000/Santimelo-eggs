@@ -18,3 +18,15 @@ export function AtualizaSozinho({ segundos = 30 }: { segundos?: number }) {
     </span>
   );
 }
+
+/** Igual, sem nada na tela (conversas: busca mensagem nova de tempo em tempo) */
+export function RecarregaSozinho({ segundos = 8 }: { segundos?: number }) {
+  const router = useRouter();
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, segundos * 1000);
+    return () => clearInterval(id);
+  }, [router, segundos]);
+  return null;
+}

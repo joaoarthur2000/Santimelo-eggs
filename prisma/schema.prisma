@@ -76,12 +76,17 @@ model Cliente {
   nomeFantasia       String
   cnpj               String?
   tipoNegocio        String
-  endereco           String?
+  endereco           String? // rua e número
+  bairro             String?
+  cidade             String?        @default("Porto Alegre")
   cep                String?
+  lat                Float? // posição do endereço (pra rota do dia), achada pelo endereço
+  lng                Float?
   responsavel        String?
   email              String?
   whatsapp           String?
-  formaPagamento     String?
+  formaPagamento     String? // Pix, Dinheiro, Boleto, Cartão, Transferência
+  notaFiscal         Boolean        @default(false) // vende com NF?
   observacoes        String?
   ativo              Boolean        @default(true)
   criadoEm           DateTime       @default(now())
@@ -96,6 +101,7 @@ model Cliente {
   precosEspeciais    PrecoCliente[]
   cobrancas          Cobranca[]
   mensagens          Mensagem[]
+  atendimentos       Atendimento[]
 }
 
 // Região de entrega (ex: Zona Norte) com os dias e horários em que o caminhão passa
@@ -169,7 +175,7 @@ model Mensagem {
   id        String    @id @default(cuid())
   clienteId String
   cliente   Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  tipo      String // PAGAMENTO | PEDIDO | AVISO
+  tipo      String // PAGAMENTO | PEDIDO | AVISO | STATUS (pedido mudou de etapa: o app avisa com som e vibração)
   texto     String
   chave     String?   @unique
   autor     String
@@ -188,12 +194,14 @@ model Pedido {
   dataEntrega DateTime
   observacao  String?
   total       Float              @default(0)
+  notaFiscal  Boolean            @default(false) // com NF: copiado do cliente quando o pedido é criado
   criadoEm    DateTime           @default(now())
   janelaId    String? // horário de entrega escolhido no app
   janela      JanelaEntrega?     @relation(fields: [janelaId], references: [id])
   itens       PedidoItem[]
   movimentos  MovimentoEstoque[]
   cobranca    Cobranca?
+  atendimentos Atendimento[]
 
   @@index([dataEntrega])
 }
@@ -235,4 +243,50 @@ model Configuracao {
   chave    String   @id
   valor    String
   alterado DateTime @updatedAt
+}
+
+// Chat do Guinho no app: o cliente escolhe o assunto e, se quiser falar com gente, vira atendimento no painel
+model Atendimento {
+  id          Int       @id @default(autoincrement()) // número do protocolo
+  clienteId   String
+  cliente     Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  setor       String // VENDAS | ENTREGA | FINANCEIRO | TECNICO
+  motivo      String // o que ele escolheu (ex: "Veio ovo quebrado")
+  detalhe     String? // o que ele escreveu
+  pedidoId    Int?
+  pedido      Pedido?   @relation(fields: [pedidoId], references: [id], onDelete: SetNull)
+  contato     String // WHATSAPP (ele chamou no WhatsApp) | RETORNO (a equipe chama ele) | CHAT (conversa no app)
+  status      String    @default("ABERTO") // ABERTO | ANDAMENTO | RESOLVIDO
+  nota        String? // anotação da equipe
+  criadoEm    DateTime  @default(now())
+  resolvidoEm DateTime?
+  conversa    MensagemAtendimento[]
+
+  @@index([status, criadoEm])
+}
+
+// Conversa do atendimento: equipe (painel) ↔ cliente (app)
+model MensagemAtendimento {
+  id            Int         @id @default(autoincrement())
+  atendimentoId Int
+  atendimento   Atendimento @relation(fields: [atendimentoId], references: [id], onDelete: Cascade)
+  de            String // CLIENTE | EQUIPE
+  autor         String
+  texto         String
+  criadaEm      DateTime    @default(now())
+  lidaEm        DateTime? // lida pelo outro lado
+
+  @@index([atendimentoId, criadaEm])
+}
+
+// Rota de entregas do dia: km pela rota calculada, km real (hodômetro) e combustível
+model RotaDia {
+  dia          String   @id // "AAAA-MM-DD"
+  ordem        String // ids dos pedidos na ordem da rota, separados por vírgula
+  kmPlanejado  Float
+  minutos      Float
+  kmReal       Float? // o que o motorista anotou no hodômetro
+  consumoKmL   Float // km por litro usado na conta
+  precoLitro   Float
+  atualizadoEm DateTime @updatedAt
 }
