@@ -4,10 +4,16 @@ import { sair } from "../login/actions";
 import { NavPainel } from "./nav-painel";
 import { db } from "@/lib/db";
 import { contarChegaram } from "./pedidos/chegaram";
+import { diaISO } from "@/lib/datas";
 
 export default async function LayoutPainel({ children }: LayoutProps<"/painel">) {
   const usuario = await exigirPapel("DIRETOR");
-  const [novos, atendimentos] = await Promise.all([contarChegaram(), db.atendimento.count({ where: { status: "ABERTO" } })]);
+  const [novos, atendimentos, atrasados] = await Promise.all([
+    contarChegaram(),
+    db.atendimento.count({ where: { status: "ABERTO" } }),
+    // clientes que não pagaram no vencimento (à vista = no dia da entrega)
+    db.cliente.count({ where: { cobrancas: { some: { pagoEm: null, vencimento: { lt: diaISO() } } } } }),
+  ]);
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
@@ -18,7 +24,7 @@ export default async function LayoutPainel({ children }: LayoutProps<"/painel">)
             <button className="text-sm text-marca-200 hover:text-white">Sair</button>
           </form>
         </div>
-        <NavPainel contadores={{ "/painel/pedidos": novos, "/painel/atendimentos": atendimentos }} />
+        <NavPainel contadores={{ "/painel/pedidos": novos, "/painel/atendimentos": atendimentos, "/painel/clientes": atrasados, "/painel/cobrancas": atrasados }} />
         <div className="mt-auto hidden border-t border-white/10 px-5 py-4 lg:block">
           <p className="text-sm font-medium">{usuario.nome}</p>
           <form action={sair}>

@@ -1,11 +1,12 @@
 import "server-only";
-import { DIAS_SEMANA, type Periodo } from "./constantes";
+import { DIAS_SEMANA, ehOvo, type Periodo } from "./constantes";
 import { pedidosNoPeriodo } from "./consultas";
 import { diaDaSemana, diaISO, fimDoDia, formatarDia, inicioDoDia, somarDias } from "./datas";
 import { db } from "./db";
 import { custosMedios } from "./estoque";
 import { nomeProduto } from "./formato";
 import { custoDaRota } from "./rota";
+import { custoVeiculo } from "./veiculo";
 
 // Relatório de vendas de ovos (pela data de entrega, pedidos não cancelados).
 // Custo de um item vendido = caixas equivalentes × custo médio das compras até o fim do período.
@@ -73,6 +74,13 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
     db.rotaDia.findMany({ where: { dia: { gte: faixa.inicio, lte: faixa.fim } }, orderBy: { dia: "asc" } }),
     db.atendimento.findMany({ where: { criadoEm: { gte: inicioDoDia(faixa.inicio), lt: fimDoDia(faixa.fim) } }, select: { setor: true, status: true } }),
   ]);
+  // Despesas da operação (fora mercadoria e combustível) e compras por fornecedor
+  const [despesas, comprasDetalhe, veiculo] = await Promise.all([
+    db.despesa.findMany({ where: { dia: { gte: ant.inicio < faixa.inicio ? ant.inicio : faixa.inicio, lte: faixa.fim } }, orderBy: { dia: "desc" } }),
+    db.movimentoEstoque.findMany({ where: { tipo: "COMPRA", data: { gte: inicioDoDia(faixa.inicio), lt: fimDoDia(faixa.fim) } }, include: { fornecedorCad: true, item: true } }),
+    // veículo: combustível + manutenção por km + fixos rateados (ver src/lib/veiculo.ts)
+    custoVeiculo(faixa.inicio, faixa.fim),
+  ]);
 
   const total = zero();
   const anterior = zero();
@@ -84,6 +92,7 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
   const porTipo = new Map<string, Grupo>();
   const porNota = new Map<string, Grupo>();
   const porCondicao = new Map<string, Grupo>();
+  const porPagamento = new Map<string, Grupo>();
   const grupo = (mapa: Map<string, Grupo>, nome: string) => {
     const g = mapa.get(nome) ?? { ...zero(), nome, pedidos: 0 };
     mapa.set(nome, g);
@@ -101,13 +110,15 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
     if (noAnterior) idsAnterior.add(p.id);
 
     for (const i of p.itens) {
-      const caixas = i.quantidade * (i.produto.fatorEstoque ?? 0);
+      // unidades de estoque consumidas (caixa de ovo ou pacote de camarão); "caixas" conta só ovo
+      const estoque = i.quantidade * (i.produto.fatorEstoque ?? 0);
+      const caixas = ehOvo(i.produto.item.unidadeEstoque) ? estoque : 0;
       const somar = (s: Soma, tabela: Map<string, number>) => {
         const c = tabela.get(i.produto.itemId);
         s.faturamento += i.subtotal;
         s.caixas += caixas;
         if (c === undefined || !i.produto.fatorEstoque) s.semCusto += i.subtotal;
-        else s.custo += caixas * c;
+        else s.custo += estoque * c;
       };
       if (f) somar(porFaixa.get(f.chave)!, custo);
       if (noAnterior) somar(anterior, custoAnterior);
@@ -134,6 +145,7 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
       somar(grupo(porTipo, p.cliente.tipoNegocio), custo);
       somar(grupo(porNota, p.notaFiscal ? "Com NF" : "Sem NF"), custo);
       somar(grupo(porCondicao, p.cliente.prazoPagamentoDias ? "A prazo" : "À vista"), custo);
+      somar(grupo(porPagamento, p.cliente.formaPagamento ?? "Não informado"), custo);
     }
     const cli = porCliente.get(p.clienteId);
     if (noPeriodo && cli) {
@@ -141,6 +153,7 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
       grupo(porTipo, p.cliente.tipoNegocio).pedidos += 1;
       grupo(porNota, p.notaFiscal ? "Com NF" : "Sem NF").pedidos += 1;
       grupo(porCondicao, p.cliente.prazoPagamentoDias ? "A prazo" : "À vista").pedidos += 1;
+      grupo(porPagamento, p.cliente.formaPagamento ?? "Não informado").pedidos += 1;
     }
   }
 
@@ -161,8 +174,34 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
   });
   const combustivel = logistica.reduce((t, l) => t + l.custo, 0);
 
-  const comLucro = <T extends Soma>(s: T) => ({ ...s, lucro: lucroDe(s), margem: s.faturamento - s.semCusto > 0 ? lucroDe(s) / (s.faturamento - s.semCusto) : null });
-  const caixasCompradas = compras.reduce((s, m) => s + m.quantidade, 0);
+  // margem = lucro ÷ venda; markup = lucro ÷ custo (quanto se põe em cima do custo)
+  const comLucro = <T extends Soma>(s: T) => ({
+    ...s,
+    lucro: lucroDe(s),
+    margem: s.faturamento - s.semCusto > 0 ? lucroDe(s) / (s.faturamento - s.semCusto) : null,
+    markup: s.custo > 0 ? lucroDe(s) / s.custo : null,
+  });
+  const caixasCompradas = compras.filter((m) => ehOvo(comprasDetalhe.find((d) => d.id === m.id)?.item.unidadeEstoque ?? "caixa")).reduce((s, m) => s + m.quantidade, 0);
+
+  // Despesas: as do período e as do período de comparação
+  const despesasPeriodo = despesas.filter((d) => d.dia >= faixa.inicio && d.dia <= faixa.fim);
+  const despesasAnterior = despesas.filter((d) => d.dia >= ant.inicio && d.dia <= ant.fim).reduce((t, d) => t + d.valor, 0);
+  const totalDespesas = despesasPeriodo.reduce((t, d) => t + d.valor, 0);
+  const porCategoria = new Map<string, number>();
+  for (const d of despesasPeriodo) porCategoria.set(d.categoria, (porCategoria.get(d.categoria) ?? 0) + d.valor);
+
+  // Compras por fornecedor (as antigas, sem cadastro, aparecem pela origem)
+  const porFornecedor = new Map<string, { nome: string; valor: number; valorOvos: number; caixas: number; pacotes: number; compras: number }>();
+  for (const m of comprasDetalhe) {
+    const nome = m.fornecedorCad?.nome ?? m.fornecedor ?? (m.origem === "CEASA" ? "CEASA (antes do cadastro)" : "Granja (antes do cadastro)");
+    const f = porFornecedor.get(nome) ?? { nome, valor: 0, valorOvos: 0, caixas: 0, pacotes: 0, compras: 0 };
+    const valor = m.quantidade * (m.custoUnit ?? 0);
+    f.valor += valor;
+    if (ehOvo(m.item.unidadeEstoque)) { f.caixas += m.quantidade; f.valorOvos += valor; } else f.pacotes += m.quantidade;
+    f.compras += 1;
+    porFornecedor.set(nome, f);
+  }
+  const valorComprado = [...porFornecedor.values()].reduce((t, f) => t + f.valor, 0);
 
   return {
     ...faixa,
@@ -186,7 +225,11 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
       km: logistica.reduce((t, l) => t + l.km, 0),
       litros: logistica.reduce((t, l) => t + l.litros, 0),
       combustivel,
-      lucroLiquido: lucroDe(total) - combustivel,
+      despesas: totalDespesas,
+      veiculo: veiculo.total,
+      veiculoManutencao: veiculo.manutencao,
+      veiculoFixos: veiculo.fixos,
+      lucroLiquido: lucroDe(total) - veiculo.total - totalDespesas,
       atendimentos: atendimentos.length,
       atendimentosAbertos: atendimentos.filter((x) => x.status !== "RESOLVIDO").length,
     },
@@ -194,6 +237,16 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
     porTipo: [...porTipo.values()].map(comLucro).sort((a, b) => b.faturamento - a.faturamento),
     porNota: [...porNota.values()].map(comLucro).sort((a, b) => a.nome.localeCompare(b.nome)),
     porCondicao: [...porCondicao.values()].map(comLucro).sort((a, b) => b.nome.localeCompare(a.nome)),
+    porPagamento: [...porPagamento.values()].map(comLucro).sort((a, b) => b.faturamento - a.faturamento),
+    despesas: {
+      total: totalDespesas,
+      anterior: despesasAnterior,
+      porCategoria: [...porCategoria].map(([categoria, valor]) => ({ categoria, valor })).sort((a, b) => b.valor - a.valor),
+      lista: despesasPeriodo,
+    },
+    fornecedores: [...porFornecedor.values()]
+      .map((f) => ({ ...f, custoMedioCaixa: f.caixas > 0 ? f.valorOvos / f.caixas : null, participacao: valorComprado > 0 ? f.valor / valorComprado : 0 }))
+      .sort((a, b) => b.valor - a.valor),
   };
 }
 

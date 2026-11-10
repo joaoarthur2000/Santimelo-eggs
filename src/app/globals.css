@@ -30,6 +30,14 @@
   --color-tomate-600: #c9311f;
   --font-eggs: var(--font-bricolage);
 
+  /* Cores oficiais da Santimelo (manual em ../ident.visual/), usadas no dashboard da Início */
+  --color-terra: #402924;   /* Terra Fértil */
+  --color-noz: #673c33;     /* Casca de Noz */
+  --color-folha: #516029;   /* Folha Fresca */
+  --color-ouro: #ffbd52;    /* Gema de Ovo */
+  --color-pimenta: #d14c19; /* Pimenta Doce */
+  --color-concha: #f9f5ef;  /* Concha */
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -42,6 +50,10 @@ body {
 @layer components {
   .campo {
     @apply w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-marca-600 focus:ring-2 focus:ring-marca-200;
+  }
+  /* campo que veio preenchido do Google: amarelo Gema de Ovo até alguém mexer */
+  .campo-auto {
+    @apply border-ouro bg-ouro/10;
   }
   .botao-primario {
     @apply inline-flex items-center justify-center gap-2 rounded-lg bg-marca-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-marca-700 disabled:opacity-60;

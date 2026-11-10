@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ORIGENS_COMPRA } from "@/lib/constantes";
 import { db } from "@/lib/db";
 import { saldos } from "@/lib/estoque";
 import { exigirPapel } from "@/lib/sessao";
@@ -19,8 +18,7 @@ const esquemaCompra = z.object({
   itemId: z.string().min(1, "Escolha o item"),
   quantidade: z.number("Informe a quantidade").positive("Informe a quantidade").max(100000),
   custoUnit: z.number("Informe o custo").nonnegative("Custo inválido").max(100000),
-  origem: z.enum(Object.keys(ORIGENS_COMPRA) as [string, ...string[]]),
-  fornecedor: z.string().max(80).nullable(),
+  fornecedorId: z.string().min(1, "Escolha o fornecedor"),
   observacao: z.string().max(300).nullable(),
 });
 
@@ -34,12 +32,14 @@ export async function registrarCompra(_e: Estado, form: FormData): Promise<Estad
     itemId: texto(form.get("itemId")) ?? "",
     quantidade,
     custoUnit: unit,
-    origem: texto(form.get("origem")),
-    fornecedor: texto(form.get("fornecedor")),
+    fornecedorId: texto(form.get("fornecedorId")) ?? "",
     observacao: texto(form.get("observacao")),
   });
   if (!r.success) return { erro: r.error.issues[0].message };
-  await db.movimentoEstoque.create({ data: { ...r.data, tipo: "COMPRA", autor: usuario.nome } });
+  const fornecedor = await db.fornecedor.findUnique({ where: { id: r.data.fornecedorId } });
+  if (!fornecedor) return { erro: "Fornecedor não encontrado" };
+  // guarda também o nome: lançamentos antigos e telas que mostram texto continuam funcionando
+  await db.movimentoEstoque.create({ data: { ...r.data, fornecedor: fornecedor.nome, origem: "FORNECEDOR", tipo: "COMPRA", autor: usuario.nome } });
   atualizar();
   return { ok: Date.now() };
 }

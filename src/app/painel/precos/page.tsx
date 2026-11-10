@@ -7,12 +7,13 @@ import { custosMedios } from "@/lib/estoque";
 import { nomeProduto, pct, reais } from "@/lib/formato";
 import { cancelarAgendado } from "../actions";
 import { FormAgendarPreco } from "../forms";
+import { FormLiberarProduto } from "./liberar";
 
-export const metadata: Metadata = { title: "Preços dos ovos" };
+export const metadata: Metadata = { title: "Preços" };
 
 export default async function PrecosOvos() {
   await aplicarPrecosAgendados();
-  const [produtos, agendados, custo] = await Promise.all([
+  const [produtos, agendados, custo, esperando] = await Promise.all([
     db.produto.findMany({
       where: { ativo: true },
       include: { item: true, _count: { select: { precosCliente: true } }, precos: { orderBy: { em: "desc" }, take: 4 } },
@@ -20,11 +21,22 @@ export default async function PrecosOvos() {
     }),
     db.precoAgendado.findMany({ where: { aplicadoEm: null }, include: { produto: { include: { item: true } } }, orderBy: { aPartirDe: "asc" } }),
     custosMedios(new Date()),
+    // produto de um tipo ativo que ainda não tem preço (ex: camarão recém-cadastrado)
+    db.produto.findMany({ where: { ativo: false, preco: 0, item: { ativo: true } }, include: { item: true } }),
   ]);
 
   return (
     <>
-      <Cabecalho titulo="Preços dos ovos" subtitulo="Preço de venda já com a margem. Agende mudanças com antecedência: o cliente vê no app antes de valer." />
+      <Cabecalho titulo="Preços" subtitulo="Preço de venda já com a margem. Agende mudanças com antecedência: o cliente vê no app antes de valer." />
+      {esperando.length > 0 && (
+        <section className="mb-6 rounded-2xl border border-ouro bg-ouro/10 p-5">
+          <h2 className="font-semibold text-terra">Esperando preço</h2>
+          <p className="mb-4 text-sm text-noz">Produto cadastrado e fora do app até ganhar preço. Lance também a primeira compra no Estoque, pra ter custo e margem.</p>
+          <div className="space-y-4">
+            {esperando.map((p) => <FormLiberarProduto key={p.id} produtoId={p.id} nome={nomeProduto(p)} />)}
+          </div>
+        </section>
+      )}
       <div className="grid gap-6 xl:grid-cols-[1fr_380px] [&>*]:min-w-0">
         <section className="cartao overflow-x-auto">
           <table className="w-full text-sm">

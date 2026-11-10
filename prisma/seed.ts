@@ -6,6 +6,7 @@
 import { PrismaClient } from "@prisma/client";
 import { gerarHash } from "../src/lib/senha";
 import { diaISO, inicioDoDia, somarDias } from "../src/lib/datas";
+import { garantirOperacao } from "./operacao";
 
 const db = new PrismaClient();
 
@@ -48,6 +49,8 @@ const CUSTO: Record<string, number> = { "Ovo branco": 125, "Ovo caipira": 360 };
 
 async function main() {
   const vazia = async (contar: () => Promise<number>) => (await contar()) === 0;
+  // Modo real (ligado em 2026-11-09, quando a Santimelo zerou os dados de exemplo): nunca mais cria exemplo
+  const modoReal = !!(await db.configuracao.findUnique({ where: { chave: "modo-real" } }));
   const hoje = diaISO();
 
   // Equipe — login de teste ADM123 / 123 (trocar antes de ir pra nuvem)
@@ -102,7 +105,7 @@ async function main() {
   }
 
   // Clientes com acesso ao app, pedidos dos últimos 45 dias, cobranças e baixa no estoque (EXEMPLO)
-  if (await vazia(() => db.cliente.count())) {
+  if (!modoReal && (await vazia(() => db.cliente.count()))) {
     const regiao = Object.fromEntries((await db.regiao.findMany()).map((r) => [r.nome, r.id]));
     const produtos = await db.produto.findMany({ include: { item: true } });
     const produto = (item: string, unidade: string) => produtos.find((p) => p.item.nome === item && p.unidade === unidade)!;
@@ -219,13 +222,16 @@ async function main() {
 
   // Login de teste ADM123: pela tela do app, entra como esse cliente (pedidos de teste aparecem no painel e nos relatórios)
   const adm = await db.usuario.findUnique({ where: { codigoAcesso: "ADM123" } });
-  if (adm && !adm.clienteId) {
+  if (!modoReal && adm && !adm.clienteId) {
     const regiao = await db.regiao.findFirst({ orderBy: { nome: "desc" } });
     const teste = await db.cliente.create({
       data: { nomeFantasia: "Santimelo (teste)", razaoSocial: "Cliente de teste", tipoNegocio: "Padaria", responsavel: "João Arthur", bairro: "Sarandi", cidade: "Porto Alegre", regiaoId: regiao?.id, prazoPagamentoDias: 7, formaPagamento: "Pix", observacoes: "Cliente de teste do login ADM123. Apagar antes de ir pra nuvem." },
     });
     await db.usuario.update({ where: { id: adm.id }, data: { clienteId: teste.id } });
   }
+
+  // Operação real: fornecedores, caipira orgânico, camarão e entregas ter/qui (só cria o que falta)
+  await garantirOperacao(db);
 }
 
 main()

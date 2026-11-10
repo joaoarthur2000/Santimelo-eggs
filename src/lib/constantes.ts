@@ -24,8 +24,31 @@ export const ORIGENS_PEDIDO = {
   WHATSAPP: "WhatsApp",
 } as const;
 
-// A Santimelo vende só ovos (bandeja de 30 e caixa de 30 dúzias) pra esses 4 tipos de negócio, em Porto Alegre e região
-export const TIPOS_NEGOCIO = ["Restaurante", "Lancheria", "Padaria", "Confeitaria"] as const;
+// A Santimelo vende ovo branco, ovo caipira orgânico e camarão (pacote 800 g congelado), entregando direto
+// pra estabelecimentos e pro consumidor final, em Porto Alegre e região (atualizado em 2026-11-09)
+export const TIPOS_NEGOCIO = ["Padaria", "Confeitaria", "Restaurante", "Lancheria", "Mercado", "Consumidor final"] as const;
+
+// Entregas: terças e quintas, das 05h às 11h
+export const DIAS_ENTREGA = [2, 4] as const;
+export const HORARIO_ENTREGA = "05h às 11h";
+
+// Gastos da operação fora a compra de mercadoria. Tudo do carro (combustível, manutenção, IPVA...) fica em Veículos
+export const CATEGORIAS_DESPESA = ["Embalagens", "Pessoal", "Aluguel e estrutura", "Impostos e taxas", "Marketing", "Outros"] as const;
+
+// Gastos reais com o veículo (o que saiu do caixa)
+export const TIPOS_GASTO_VEICULO = {
+  ABASTECIMENTO: "Abastecimento",
+  MANUTENCAO: "Manutenção e revisão",
+  PNEUS: "Pneus",
+  IPVA: "IPVA",
+  SEGURO: "Seguro",
+  LICENCIAMENTO: "Licenciamento",
+  LAVAGEM: "Lavagem",
+  ESTACIONAMENTO: "Estacionamento e pedágio",
+  MULTA: "Multa",
+  OUTRO: "Outro",
+} as const;
+export type TipoGastoVeiculo = keyof typeof TIPOS_GASTO_VEICULO;
 
 export const CIDADES = [
   "Porto Alegre", "Canoas", "Cachoeirinha", "Gravataí", "Alvorada", "Viamão", "Esteio", "Sapucaia do Sul",
@@ -36,6 +59,10 @@ export const CIDADES = [
 export const PRAZOS_PAGAMENTO = [0, 7, 14, 21, 28, 30] as const;
 export const FORMAS_PAGAMENTO = ["Pix", "Dinheiro", "Boleto", "Cartão", "Transferência"] as const;
 export const condicaoPagamento = (prazo: number | null | undefined) => (prazo ? `A prazo · ${prazo} dias` : "À vista");
+
+/** Ovos são contados em caixas; o camarão, em pacotes de 800 g */
+export const categoriaDoItem = (unidadeEstoque: string) => (unidadeEstoque === "caixa" ? "Ovos" : "Congelados");
+export const ehOvo = (unidadeEstoque: string) => unidadeEstoque === "caixa";
 
 export const UNIDADES: Record<string, string> = {
   bandeja: "bdj",
@@ -52,7 +79,7 @@ export const TIPOS_MOVIMENTO = {
 } as const;
 export type TipoMovimento = keyof typeof TIPOS_MOVIMENTO;
 
-// De onde veio a compra: granja; se a granja não entregar, CEASA
+// Origem das compras lançadas antes do cadastro de fornecedores (2026-11-09). Compras novas usam Fornecedor
 export const ORIGENS_COMPRA = {
   GRANJA: "Granja",
   CEASA: "CEASA",

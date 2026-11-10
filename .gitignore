@@ -45,3 +45,6 @@ next-env.d.ts
 # banco local
 prisma/*.db
 prisma/*.db-journal
+
+# cópias de segurança do banco local
+prisma/backups/

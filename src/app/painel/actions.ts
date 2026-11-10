@@ -163,7 +163,13 @@ export async function salvarDados(clienteId: string, _e: Estado, form: FormData)
   await exigirPapel("DIRETOR");
   const r = lerDados(form);
   if (!r.success) return { erro: r.error.issues[0].message };
-  await db.cliente.update({ where: { id: clienteId }, data: { ...r.data, razaoSocial: r.data.razaoSocial ?? r.data.nomeFantasia, lat: null, lng: null } }); // endereço pode ter mudado: localiza de novo na próxima rota
+  // endereço mudou: apaga a posição e a próxima rota localiza de novo. Não mudou: mantém (pode ser a posição exata do Google)
+  const antes = await db.cliente.findUnique({ where: { id: clienteId }, select: { endereco: true, bairro: true, cidade: true } });
+  const mudou = !antes || antes.endereco !== (r.data.endereco ?? null) || antes.bairro !== (r.data.bairro ?? null) || antes.cidade !== (r.data.cidade ?? null);
+  await db.cliente.update({
+    where: { id: clienteId },
+    data: { ...r.data, razaoSocial: r.data.razaoSocial ?? r.data.nomeFantasia, ...(mudou ? { lat: null, lng: null } : {}) },
+  });
   atualizar();
   return { ok: Date.now() };
 }

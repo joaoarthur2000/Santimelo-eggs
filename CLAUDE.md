@@ -35,6 +35,7 @@ Next.js 16 (App Router, Turbopack) + Prisma 6 + Tailwind 4. SQLite local em `pri
   - Custo de um item = caixas equivalentes × custo médio da caixa até o fim do período. Venda sem compra lançada vai pra `semCusto` e fica fora do lucro.
   - Comparação: o dia compara com o mesmo dia da semana passada (entrega depende do dia da semana); semana e mês com o anterior.
 - **Configuracao** guarda manutenção e novidades do app (`src/lib/config.ts`). A versão é o `.next/BUILD_ID`, que o app consulta em `/eggs/versao`. O link e o QR do app vêm de `linkDoApp()` (`APP_URL` ou o IP da rede, porta 3001).
+- **Prospecção** (`src/lib/prospeccao.ts`, `/painel/prospeccao`, tabela `Lead`): busca no Google Places API (New) com `GOOGLE_PLACES_API_KEY`, regiões e filtros no próprio arquivo, CNPJ/porte pela BrasilAPI. Sem `server-only` de propósito: o bot (`../prospeccao-bot`) usa pela linha de comando `npx tsx scripts/prospeccao.ts`. Status em `STATUS_LEAD` (lá, não em constantes.ts).
 - **Campos de status/tipo são `String`.** Os valores válidos ficam em `src/lib/constantes.ts`.
 - **Datas sempre no fuso de Porto Alegre** via `src/lib/datas.ts`. Formatadores `Intl` criados uma vez só (criar por chamada deixava páginas lentíssimas).
 

@@ -60,7 +60,7 @@ export default async function CobrancasOvos() {
                   <td className="px-4 py-2">
                     <Link href={`/painel/clientes/${c.clienteId}`} className="hover:underline">{c.cliente.nomeFantasia}</Link>
                   </td>
-                  <td className="px-4 py-2">{c.pedidoId && <Link href={`/painel/pedidos/${c.pedidoId}`} className="text-marca-700 hover:underline">#{c.pedidoId}</Link>}</td>
+                  <td className="px-4 py-2">{c.pedidoId ? <Link href={`/painel/pedidos/${c.pedidoId}`} className="text-marca-700 hover:underline">#{c.pedidoId}</Link> : <span className="text-xs text-stone-500">{c.descricao ?? "lançado à mão"}</span>}</td>
                   <td className="tabular px-4 py-2 text-right font-semibold">{reais(c.valor)}</td>
                   <td className="px-4 py-2 text-right">
                     <form action={marcarPago.bind(null, c.id)}>
@@ -85,7 +85,7 @@ export default async function CobrancasOvos() {
           {pagas.map((c) => (
             <li key={c.id} className="flex items-center justify-between gap-3 py-2">
               <span>
-                {c.cliente.nomeFantasia} · pedido #{c.pedidoId}
+                {c.cliente.nomeFantasia} · {c.pedidoId ? `pedido #${c.pedidoId}` : (c.descricao ?? "lançado à mão")}
                 <span className="block text-xs text-stone-500">pago {formatarDataCurta(c.pagoEm!)} · vencia {data(c.vencimento)}</span>
               </span>
               <span className="flex items-center gap-3">

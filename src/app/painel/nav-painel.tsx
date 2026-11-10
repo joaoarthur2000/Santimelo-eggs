@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, ClipboardList, Headset, LayoutDashboard, Route, Smartphone, Tags, Truck, Users, Wallet, Warehouse } from "lucide-react";
+import { BarChart3, Car, ClipboardList, Handshake, Headset, LayoutDashboard, Radar, Receipt, Route, Smartphone, Tags, Truck, Users, Wallet, Warehouse } from "lucide-react";
 
 // Agrupado como a operação funciona: vendas → entrega e dinheiro → gestão
 const GRUPOS = [
@@ -18,6 +18,7 @@ const GRUPOS = [
     links: [
       { href: "/painel/pedidos", rotulo: "Pedidos", icone: ClipboardList },
       { href: "/painel/clientes", rotulo: "Clientes", icone: Users },
+      { href: "/painel/prospeccao", rotulo: "Prospecção", icone: Radar },
       { href: "/painel/atendimentos", rotulo: "Atendimentos", icone: Headset },
       { href: "/painel/precos", rotulo: "Preços", icone: Tags },
     ],
@@ -27,8 +28,16 @@ const GRUPOS = [
     links: [
       { href: "/painel/rotas", rotulo: "Rotas", icone: Route },
       { href: "/painel/entregas", rotulo: "Regiões e horários", icone: Truck },
-      { href: "/painel/cobrancas", rotulo: "Cobranças", icone: Wallet },
       { href: "/painel/estoque", rotulo: "Estoque", icone: Warehouse },
+      { href: "/painel/fornecedores", rotulo: "Fornecedores", icone: Handshake },
+      { href: "/painel/veiculos", rotulo: "Veículos", icone: Car },
+    ],
+  },
+  {
+    titulo: "Financeiro",
+    links: [
+      { href: "/painel/cobrancas", rotulo: "Cobranças", icone: Wallet },
+      { href: "/painel/despesas", rotulo: "Despesas", icone: Receipt },
     ],
   },
   {

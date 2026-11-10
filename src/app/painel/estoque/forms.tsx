@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { ORIGENS_COMPRA } from "@/lib/constantes";
 import { registrarCompra, registrarContagem, registrarPerda } from "./actions";
 
 export type OpcaoItem = { id: string; nome: string; codigo: string | null; unidade: string; categoria: string };
@@ -15,7 +14,7 @@ function SeletorItem({ itens, valor, onChange }: { itens: OpcaoItem[]; valor: st
   const categorias = [...new Set(itens.map((i) => i.categoria))];
   return (
     <select name="itemId" required value={valor} onChange={(e) => onChange(e.target.value)} className="campo">
-      <option value="">Tipo de ovo…</option>
+      <option value="">Produto…</option>
       {categorias.map((c) => (
         <optgroup key={c} label={c}>
           {itens
@@ -32,7 +31,9 @@ function SeletorItem({ itens, valor, onChange }: { itens: OpcaoItem[]; valor: st
 }
 
 /** Compra, perda ou contagem, em abas */
-export function FormMovimento({ itens, itemInicial = "" }: { itens: OpcaoItem[]; itemInicial?: string }) {
+export type OpcaoFornecedor = { id: string; nome: string };
+
+export function FormMovimento({ itens, fornecedores, itemInicial = "" }: { itens: OpcaoItem[]; fornecedores: OpcaoFornecedor[]; itemInicial?: string }) {
   const [aba, setAba] = useState<keyof typeof ACOES>("compra");
   const [itemId, setItemId] = useState(itemInicial);
   const [estado, acao, enviando] = useActionState<Estado, FormData>(ACOES[aba], {});
@@ -71,14 +72,12 @@ export function FormMovimento({ itens, itemInicial = "" }: { itens: OpcaoItem[];
                 <input name="custoTotal" inputMode="decimal" placeholder="0,00" className="campo mt-1" />
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <select name="origem" defaultValue="GRANJA" className="campo">
-                {Object.entries(ORIGENS_COMPRA).map(([v, r]) => (
-                  <option key={v} value={v}>{r}</option>
-                ))}
-              </select>
-              <input name="fornecedor" placeholder="Fornecedor (opcional)" className="campo" />
-            </div>
+            <select name="fornecedorId" required defaultValue="" className="campo">
+              <option value="" disabled>Fornecedor…</option>
+              {fornecedores.map((f) => (
+                <option key={f.id} value={f.id}>{f.nome}</option>
+              ))}
+            </select>
             <input name="observacao" placeholder="Observação (nota, lote...)" className="campo" />
           </>
         )}

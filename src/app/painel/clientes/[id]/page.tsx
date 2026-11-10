@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MapPin, TriangleAlert } from "lucide-react";
+import { FormEmAberto, FormValoresCaixa } from "../rapido/form";
 import { Cabecalho, Etiqueta } from "@/components/ui";
 import { ASSINATURA_EGGS, condicaoPagamento, STATUS_PEDIDO, type StatusPedido } from "@/lib/constantes";
 import { diaISO, fimDoDia, formatarDataCurta, inicioDoDia, somarDias } from "@/lib/datas";
@@ -58,6 +59,11 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
             : `${cliente.tipoNegocio} · sem acesso ao app (pede por WhatsApp ou telefone)`
         }
       >
+        {cliente.linkMaps && (
+          <a href={cliente.linkMaps} target="_blank" rel="noopener noreferrer" className="botao-secundario">
+            <MapPin className="size-4" /> Abrir no Maps
+          </a>
+        )}
         {cliente.usuario?.bloqueadoAte && cliente.usuario.bloqueadoAte > new Date() && (
           <form action={desbloquear.bind(null, cliente.id)}>
             <button className="botao-secundario text-red-700">Destravar (errou a senha)</button>
@@ -69,6 +75,31 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
           </form>
         )}
       </Cabecalho>
+
+      {vencido > 0 && (
+        <section className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 p-5" role="alert">
+          <div>
+            <h2 className="flex items-center gap-2 font-semibold text-red-800"><TriangleAlert className="size-5" /> Não pagou: {reais(vencido)} vencido</h2>
+            <p className="mt-1 text-sm text-red-700">
+              {cliente.cobrancas.filter((c) => !c.pagoEm && c.vencimento < hoje).map((c) => `${reais(c.valor)} venceu ${c.vencimento.slice(8, 10)}/${c.vencimento.slice(5, 7)}`).join(" · ")}
+            </p>
+          </div>
+          <Link href="/painel/cobrancas" className="botao-secundario">Ver cobranças</Link>
+        </section>
+      )}
+
+      <section className="mb-6 grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+        <div className="cartao p-5">
+          <h2 className="mb-3 font-semibold text-marca-950">Valores da caixa</h2>
+          <FormValoresCaixa clienteId={cliente.id} venda={cliente.valorVenda} custo={cliente.valorCusto} />
+          <p className="mt-2 text-xs text-stone-500">A venda vira o preço combinado da caixa de ovo branco: os pedidos dele saem nesse valor.</p>
+        </div>
+        <div className="cartao p-5">
+          <h2 className="mb-1 font-semibold text-marca-950">Lançar valor em aberto</h2>
+          <p className="mb-3 text-xs text-stone-500">Venda antiga ou combinada fora do sistema. Se passar do vencimento sem pagar, o cliente fica em alerta.</p>
+          <FormEmAberto clienteId={cliente.id} hoje={hoje} />
+        </div>
+      </section>
 
       <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5 [&>*]:min-w-0">
         {[

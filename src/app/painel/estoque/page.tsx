@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Cabecalho, Codigo, Indicador } from "@/components/ui";
-import { TIPOS_MOVIMENTO, ORIGENS_COMPRA, type TipoMovimento } from "@/lib/constantes";
+import { TIPOS_MOVIMENTO, ORIGENS_COMPRA, UNIDADES, categoriaDoItem, type TipoMovimento } from "@/lib/constantes";
 import { diaISO, formatarDataCurta, formatarHora, inicioDoDia, somarDias, fimDoDia } from "@/lib/datas";
 import { db } from "@/lib/db";
 import { custosMedios, saldos } from "@/lib/estoque";
@@ -19,7 +19,7 @@ export default async function Estoque({ searchParams }: PageProps<"/painel/estoq
   const agora = fimDoDia(hoje);
   const inicio7 = inicioDoDia(somarDias(hoje, -6));
 
-  const [itens, saldo, custo, mov7, extrato] = await Promise.all([
+  const [itens, saldo, custo, mov7, extrato, fornecedores] = await Promise.all([
     db.item.findMany({ orderBy: { ordem: "asc" } }),
     saldos(agora),
     custosMedios(agora),
@@ -30,6 +30,7 @@ export default async function Estoque({ searchParams }: PageProps<"/painel/estoq
       orderBy: { data: "desc" },
       take: 60,
     }),
+    db.fornecedor.findMany({ where: { ativo: true }, orderBy: { ordem: "asc" }, select: { id: true, nome: true } }),
   ]);
   const saida7 = new Map(mov7.map((m) => [m.itemId, -(m._sum.quantidade ?? 0)]));
 
@@ -105,7 +106,8 @@ export default async function Estoque({ searchParams }: PageProps<"/painel/estoq
             <h2 className="mb-3 font-semibold text-marca-950">Registrar</h2>
             <FormMovimento
               itemInicial={filtroItem?.id}
-              itens={itens.filter((i) => i.ativo).map((i) => ({ id: i.id, nome: i.nome, codigo: i.codigo, unidade: i.unidadeEstoque, categoria: "Ovos" }))}
+              fornecedores={fornecedores}
+              itens={itens.filter((i) => i.ativo).map((i) => ({ id: i.id, nome: i.nome, codigo: i.codigo, unidade: i.unidadeEstoque, categoria: categoriaDoItem(i.unidadeEstoque) }))}
             />
           </section>
 
@@ -122,9 +124,8 @@ export default async function Estoque({ searchParams }: PageProps<"/painel/estoq
                     <span className="text-stone-500"> · {m.item.codigo} {m.item.nome}</span>
                     <span className="block text-xs text-stone-500">
                       {formatarDataCurta(m.data)} {formatarHora(m.data)} · {m.autor}
-                      {m.origem && ` · ${ORIGENS_COMPRA[m.origem as keyof typeof ORIGENS_COMPRA] ?? m.origem}`}
-                      {m.fornecedor && ` (${m.fornecedor})`}
-                      {m.custoUnit !== null && ` · ${reais(m.custoUnit)}/cx`}
+                      {m.fornecedor ? ` · ${m.fornecedor}` : m.origem && ` · ${ORIGENS_COMPRA[m.origem as keyof typeof ORIGENS_COMPRA] ?? m.origem}`}
+                      {m.custoUnit !== null && ` · ${reais(m.custoUnit)}/${UNIDADES[m.item.unidadeEstoque] ?? m.item.unidadeEstoque}`}
                       {m.observacao && ` · ${m.observacao}`}
                     </span>
                   </span>

@@ -98,10 +98,17 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
           <h2 className="text-sm font-semibold uppercase tracking-wide text-marca-200">Fechamento · {r.titulo}</h2>
           <dl className="mt-3 space-y-1.5 text-sm">
             <div className="flex justify-between gap-3"><dt>Faturamento</dt><dd className="tabular font-semibold">{reais(t.faturamento)}</dd></div>
-            <div className="flex justify-between gap-3 text-marca-100"><dt>− Custo dos ovos</dt><dd className="tabular">{reais(t.custo + t.semCusto)}</dd></div>
+            <div className="flex justify-between gap-3 text-marca-100"><dt>− Custo das mercadorias</dt><dd className="tabular">{reais(t.custo + t.semCusto)}</dd></div>
             <div className="flex justify-between gap-3 text-marca-100">
-              <dt>− Combustível <span className="text-xs text-marca-200">({km(f.km)} · {litros(f.litros)})</span></dt>
-              <dd className="tabular">{reais(f.combustivel)}</dd>
+              <dt>
+                − Veículo <Link href="/painel/veiculos" className="text-xs text-marca-200 underline-offset-2 hover:underline print:hidden">detalhes</Link>
+                <span className="block text-xs text-marca-200">combustível {reais(f.combustivel)} ({km(f.km)} · {litros(f.litros)}) · manutenção {reais(f.veiculoManutencao)} · fixos {reais(f.veiculoFixos)}</span>
+              </dt>
+              <dd className="tabular">{reais(f.veiculo)}</dd>
+            </div>
+            <div className="flex justify-between gap-3 text-marca-100">
+              <dt>− Despesas <Link href="/painel/despesas" className="text-xs text-marca-200 underline-offset-2 hover:underline print:hidden">lançar</Link></dt>
+              <dd className="tabular">{reais(f.despesas)}</dd>
             </div>
             <div className="flex items-baseline justify-between gap-3 border-t border-white/20 pt-2">
               <dt className="font-semibold">{f.lucroLiquido < 0 ? "Prejuízo" : "Lucro líquido"}</dt>
@@ -116,7 +123,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
             ["A receber hoje", reais(f.aReceber), f.vencido ? `${reais(f.vencido)} vencido` : "nada vencido"],
             ["Entregas", num(f.entregas), `${cx(t.caixas)} entregues`],
             ["Km rodados", km(f.km), f.km ? `${reais(f.combustivel / f.km)} por km` : "gere as rotas"],
-            ["Combustível por caixa", t.caixas && f.combustivel ? reais(f.combustivel / t.caixas) : "—", "gasolina ÷ caixas"],
+            ["Veículo por caixa", t.caixas && f.veiculo ? reais(f.veiculo / t.caixas) : "—", "Fiorino ÷ caixas entregues"],
             ["Atendimentos", num(f.atendimentos), f.atendimentosAbertos ? `${num(f.atendimentosAbertos)} ainda abertos` : "todos resolvidos"],
           ].map(([rotulo, valor, sub], n) => (
             <div key={rotulo} className={`rounded-xl bg-white/10 p-3 ${n === 1 && f.vencido ? "ring-2 ring-red-300" : ""}`}>
@@ -230,7 +237,8 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
                 <th className="px-4 py-2 text-right">Faturamento</th>
                 <th className="px-4 py-2 text-right">Custo</th>
                 <th className="px-4 py-2 text-right">Lucro</th>
-                <th className="w-32 px-4 py-2">Margem</th>
+                <th className="px-4 py-2 text-right" title="Lucro ÷ custo: quanto se coloca em cima do custo">Markup</th>
+                <th className="w-32 px-4 py-2" title="Lucro ÷ venda: quanto de cada real vendido sobra">Margem</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
@@ -250,6 +258,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
                   <td className="tabular px-4 py-2.5 text-right">{reais(p.faturamento)}</td>
                   <td className="tabular px-4 py-2.5 text-right">{reais(p.custo)}</td>
                   <td className="tabular px-4 py-2.5 text-right font-semibold">{reais(p.lucro)}</td>
+                  <td className="tabular px-4 py-2.5 text-right text-stone-600">{p.markup !== null ? pct(p.markup) : "—"}</td>
                   <td className="px-4 py-2.5">
                     {p.margem !== null ? (
                       <span className="flex items-center gap-2">
@@ -266,7 +275,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
               ))}
               {r.porProduto.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-stone-500">Nenhuma venda no período.</td>
+                  <td colSpan={8} className="px-4 py-8 text-center text-stone-500">Nenhuma venda no período.</td>
                 </tr>
               )}
             </tbody>
@@ -279,6 +288,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
                   <td className="tabular px-4 py-3 text-right">{reais(t.faturamento)}</td>
                   <td className="tabular px-4 py-3 text-right">{reais(t.custo)}</td>
                   <td className="tabular px-4 py-3 text-right">{reais(t.lucro)}</td>
+                  <td className="tabular px-4 py-3 text-right text-xs">{t.markup !== null ? pct(t.markup) : ""}</td>
                   <td className="tabular px-4 py-3 text-xs">{t.margem !== null ? pct(t.margem) : ""}</td>
                 </tr>
               </tfoot>
@@ -315,6 +325,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
           {[
             { titulo: "Com NF × sem NF", sub: "Pela nota de cada pedido.", grupos: r.porNota },
             { titulo: "À vista × a prazo", sub: "Pela condição de pagamento do cliente.", grupos: r.porCondicao },
+            { titulo: "Forma de pagamento", sub: "Dinheiro, Pix e outras, pelo cadastro do cliente.", grupos: r.porPagamento },
           ].map(({ titulo, sub, grupos }) => (
             <div key={titulo} className="cartao p-5">
               <h2 className="font-semibold text-marca-950">{titulo}</h2>
@@ -442,7 +453,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
         </div>
         <div className="cartao p-5">
           <h2 className="font-semibold text-marca-950">Compras de ovos no período</h2>
-          <p className="mt-1 text-xs text-stone-500">O que entrou no estoque (granja, CEASA). Base do custo médio.</p>
+          <p className="mt-1 text-xs text-stone-500">O que entrou no estoque, de todos os fornecedores. Base do custo médio.</p>
           <dl className="mt-4 grid grid-cols-2 gap-4">
             <div>
               <dt className="text-xs text-stone-500">Caixas compradas</dt>
@@ -464,6 +475,71 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
           <Link href="/painel/estoque" className="mt-4 inline-block text-sm text-marca-700 hover:underline print:hidden">
             Lançar compra no estoque →
           </Link>
+        </div>
+      </section>
+
+      <section className="mt-6 grid gap-6 xl:grid-cols-[3fr_2fr] [&>*]:min-w-0">
+        <div className="cartao overflow-x-auto">
+          <h2 className="px-5 pt-5 font-semibold text-marca-950">Compras por fornecedor</h2>
+          <p className="px-5 text-xs text-stone-500">Quanto saiu pra cada fornecedor e o custo médio da caixa de cada um.</p>
+          <table className="mt-3 w-full text-sm">
+            <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
+              <tr>
+                <th className="px-4 py-2">Fornecedor</th>
+                <th className="px-4 py-2 text-right">Compras</th>
+                <th className="px-4 py-2 text-right">Caixas</th>
+                <th className="px-4 py-2 text-right">Custo médio/cx</th>
+                <th className="px-4 py-2 text-right">Valor</th>
+                <th className="w-32 px-4 py-2">Participação</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {r.fornecedores.map((fo) => (
+                <tr key={fo.nome}>
+                  <td className="px-4 py-2.5 font-medium">{fo.nome}</td>
+                  <td className="tabular px-4 py-2.5 text-right">{num(fo.compras)}</td>
+                  <td className="tabular px-4 py-2.5 text-right">{cx(fo.caixas)}{fo.pacotes > 0 && <span className="block text-xs text-stone-500">{num(fo.pacotes)} pct</span>}</td>
+                  <td className="tabular px-4 py-2.5 text-right">{fo.custoMedioCaixa !== null ? reais(fo.custoMedioCaixa) : "—"}</td>
+                  <td className="tabular px-4 py-2.5 text-right font-semibold">{reais(fo.valor)}</td>
+                  <td className="px-4 py-2.5">
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 flex-1 overflow-hidden rounded-full bg-stone-200" aria-hidden>
+                        <span className="block h-full rounded-full bg-marca-600" style={{ width: `${fo.participacao * 100}%` }} />
+                      </span>
+                      <span className="tabular w-10 text-right text-xs font-semibold">{pct(fo.participacao)}</span>
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {r.fornecedores.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-stone-500">Nenhuma compra lançada no período.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="cartao p-5">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="font-semibold text-marca-950">Despesas da operação</h2>
+            <Link href="/painel/despesas" className="text-sm text-marca-700 hover:underline print:hidden">Lançar →</Link>
+          </div>
+          <p className="mt-1 text-xs text-stone-500">Fora mercadoria e combustível (o combustível vem das Rotas).</p>
+          <p className="tabular mt-4 text-3xl font-bold text-marca-950">{reais(r.despesas.total)}</p>
+          <p className="text-xs text-stone-500">{r.anteriorRotulo}: {reais(r.despesas.anterior)}</p>
+          {r.despesas.porCategoria.length ? (
+            <ul className="mt-4 space-y-2 text-sm">
+              {r.despesas.porCategoria.map((c) => (
+                <li key={c.categoria} className="flex items-center gap-3">
+                  <span className="w-40 shrink-0 truncate">{c.categoria}</span>
+                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-stone-200" aria-hidden>
+                    <span className="block h-full rounded-full" style={{ width: `${(c.valor / (r.despesas.total || 1)) * 100}%`, background: COR_CUSTO }} />
+                  </span>
+                  <span className="tabular w-24 text-right font-medium">{reais(c.valor)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-stone-500">Nenhuma despesa lançada no período.</p>
+          )}
         </div>
       </section>
     </>
