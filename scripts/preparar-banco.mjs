@@ -15,4 +15,5 @@ if (!existsSync(".env")) {
 }
 
 rodar("npx", ["prisma", "migrate", "deploy"]);
+rodar("npx", ["prisma", "generate"]); // campo novo no schema já vale ao subir o servidor
 rodar("npx", ["tsx", "prisma/seed.ts"]);

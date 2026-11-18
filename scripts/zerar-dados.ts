@@ -1,7 +1,7 @@
-// Zera os dados da operação pra começar com os dados reais (usado em 2026-11-09).
-// APAGA: clientes e logins de clientes, pedidos, cobranças, estoque, despesas, rotas, gastos do veículo,
+// Zera os dados da operação pra começar com os dados reais (usado em 2026-11-09 e 2026-11-17).
+// APAGA: clientes e logins de clientes, pedidos, cobranças, estoque, pagamentos a fornecedores, despesas, rotas, gastos do veículo,
 //        atendimentos, mensagens, preços combinados e agendados, histórico de preços.
-// MANTÉM: logins da equipe, produtos e preços atuais, fornecedores, veículos, regiões e horários de entrega.
+// MANTÉM: logins da equipe, produtos e preços atuais, fornecedores, veículos, regiões e horários de entrega, prospecção (leads).
 // Liga o "modo real": o seed nunca mais cria dados de exemplo.
 // Rodar (servidor parado, com backup feito): npx tsx scripts/zerar-dados.ts --confirmar
 import { PrismaClient } from "@prisma/client";
@@ -23,6 +23,7 @@ async function main() {
       mensagens: (await tx.mensagem.deleteMany()).count,
       cobrancas: (await tx.cobranca.deleteMany()).count,
       estoque: (await tx.movimentoEstoque.deleteMany()).count,
+      pagamentosFornecedor: (await tx.pagamentoFornecedor.deleteMany()).count,
       itensDePedido: (await tx.pedidoItem.deleteMany()).count,
       pedidos: (await tx.pedido.deleteMany()).count,
       precosCombinados: (await tx.precoCliente.deleteMany()).count,

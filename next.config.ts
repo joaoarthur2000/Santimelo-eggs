@@ -12,7 +12,13 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ipsDaRede,
   // Sistema interno atrás de login, com dados ao vivo: tudo renderiza por requisição.
   // Por isso Cache Components / Partial Prefetching ficam desligados.
+  // Navegação instantânea: telas já abertas/pré-carregadas são reaproveitadas por alguns segundos
+  // (qualquer lançamento chama revalidatePath e atualiza na hora; Pedidos/Início ainda se atualizam sozinhos)
+  experimental: {
+    staleTimes: { dynamic: 30, static: 60 },
+  },
   turbopack: {
+    root: process.cwd(), // evita o aviso do package-lock.json solto na pasta do usuário
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],

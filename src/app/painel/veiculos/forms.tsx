@@ -1,5 +1,6 @@
 "use client";
 
+import { CampoData } from "@/components/campo-data";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { TIPOS_GASTO_VEICULO } from "@/lib/constantes";
 import { lancarGasto, salvarVeiculo } from "./actions";
@@ -66,7 +67,7 @@ export function FormGasto({ veiculoId, hoje }: { veiculoId: string; hoje: string
         <select name="tipo" value={tipo} onChange={(e) => setTipo(e.target.value)} className="campo">
           {Object.entries(TIPOS_GASTO_VEICULO).map(([k, r]) => <option key={k} value={k}>{r}</option>)}
         </select>
-        <input name="dia" type="date" required defaultValue={hoje} className="campo" />
+        <CampoData name="dia" required defaultValue={hoje} className="campo" />
         <input name="valor" inputMode="decimal" required placeholder="Valor (R$)" className="campo" />
         {tipo === "ABASTECIMENTO" ? <input name="litros" inputMode="decimal" placeholder="Litros" className="campo" /> : <input name="km" inputMode="numeric" placeholder="Hodômetro (opcional)" className="campo" />}
         {tipo === "ABASTECIMENTO" && <input name="km" inputMode="numeric" placeholder="Hodômetro (opcional)" className="campo col-span-2" />}

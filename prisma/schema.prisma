@@ -219,6 +219,8 @@ model PedidoItem {
   quantidade Float
   precoUnit  Float
   subtotal   Float
+  fornecedorId String? // de qual fornecedor saíram essas caixas: baixa o estoque dele e dá o rastreio fornecedor → cliente
+  fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id])
 }
 
 // Extrato do estoque, em caixas. tipo: COMPRA (+) | VENDA (âˆ’, pedido saiu pra entrega) | PERDA (âˆ’) | AJUSTE (Â±, contagem)
@@ -233,6 +235,7 @@ model MovimentoEstoque {
   custoUnit  Float? // sÃ³ na compra: R$ por caixa
   origem     String? // na compra (lanÃ§amentos antigos): GRANJA | CEASA | FORNECEDOR
   fornecedor String? // nome livre (lanÃ§amentos antigos); os novos usam fornecedorId
+  marca      String? // marca dos ovos comprados (ex: Granja X), lançada em Fornecedores
   fornecedorId String?
   fornecedorCad Fornecedor? @relation(fields: [fornecedorId], references: [id])
   pedidoId   Int?
@@ -254,6 +257,23 @@ model Fornecedor {
   ordem      Int                @default(0)
   criadoEm   DateTime           @default(now())
   compras    MovimentoEstoque[]
+  itensVendidos PedidoItem[]
+  pagamentos PagamentoFornecedor[]
+}
+
+// Pagamento feito a um fornecedor: abate do que a Santimelo deve pelas compras (A pagar = comprado − pago)
+model PagamentoFornecedor {
+  id           String     @id @default(cuid())
+  fornecedorId String
+  fornecedor   Fornecedor @relation(fields: [fornecedorId], references: [id])
+  dia          String // "AAAA-MM-DD"
+  valor        Float
+  forma        String? // "Pix" | "Dinheiro" (pagamentos lançados antes de 18/11 ficam sem)
+  observacao   String?
+  autor        String
+  criadoEm     DateTime   @default(now())
+
+  @@index([fornecedorId])
 }
 
 // Gasto da operaÃ§Ã£o que nÃ£o Ã© compra de mercadoria (embalagem, manutenÃ§Ã£o, pessoal...). CombustÃ­vel vem das rotas.

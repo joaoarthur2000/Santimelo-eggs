@@ -1,5 +1,6 @@
 "use client";
 
+import { CampoData } from "@/components/campo-data";
 import { useActionState, useEffect, useRef, useTransition } from "react";
 import { MessageCircle, Search, Upload } from "lucide-react";
 import { STATUS_LEAD } from "@/lib/prospeccao";
@@ -94,7 +95,7 @@ export function FormLead({ lead }: { lead: { id: string; status: string; proximo
       </label>
       <label className="text-xs text-stone-500">
         Voltar a falar em
-        <input name="proximoPasso" type="date" defaultValue={lead.proximoPasso ?? ""} className="campo mt-1" />
+        <CampoData name="proximoPasso" defaultValue={lead.proximoPasso ?? ""} className="campo mt-1" />
       </label>
       <label className="text-xs text-stone-500">
         CNPJ (puxa razão social e porte)

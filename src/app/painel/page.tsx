@@ -320,7 +320,7 @@ export default async function Inicio() {
       <section className="mt-8 grid gap-6 xl:grid-cols-[2fr_3fr] [&>*]:min-w-0">
         <div className="cartao p-5">
           <h2 className="mb-3 font-semibold text-terra">Registrar compra, perda ou contagem</h2>
-          <FormMovimento fornecedores={fornecedores} itens={itens.filter((i) => i.ativo).map((i) => ({ id: i.id, nome: i.nome, codigo: i.codigo, unidade: i.unidadeEstoque, categoria: categoriaDoItem(i.unidadeEstoque) }))} />
+          <FormMovimento hoje={hoje} fornecedores={fornecedores} itens={itens.filter((i) => i.ativo).map((i) => ({ id: i.id, nome: i.nome, codigo: i.codigo, unidade: i.unidadeEstoque, categoria: categoriaDoItem(i.unidadeEstoque) }))} />
         </div>
         <div className="cartao p-5">
           <div className="mb-3 flex items-center justify-between">

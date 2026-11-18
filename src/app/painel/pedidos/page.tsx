@@ -2,13 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Cabecalho, Codigo, Etiqueta, SeletorDia, Vazio } from "@/components/ui";
-import { ORIGENS_PEDIDO, STATUS_PEDIDO, type StatusPedido } from "@/lib/constantes";
+import { FLUXO_PEDIDO, ORIGENS_PEDIDO, STATUS_PEDIDO, type StatusPedido } from "@/lib/constantes";
 import { listaDeSeparacao } from "@/lib/consultas";
 import { db } from "@/lib/db";
 import { diaValido, fimDoDia, formatarDia, inicioDoDia } from "@/lib/datas";
 import { quantidade, reais } from "@/lib/formato";
 import { AtualizaSozinho } from "@/components/atualiza-sozinho";
-import { PedidosQueChegaram } from "./chegaram";
+import { PedidosQueChegaram, porDataDeEntrega } from "./chegaram";
+import { ExcluirPedido } from "./excluir-pedido";
+
+// filtros do topo: o fluxo do painel (Novo → Entregue) + Cancelado
+const FILTROS: StatusPedido[] = [...FLUXO_PEDIDO, "CANCELADO"];
 
 export const metadata: Metadata = { title: "Pedidos" };
 
@@ -24,8 +28,8 @@ export default async function Pedidos({ searchParams }: PageProps<"/painel/pedid
       janela: true,
       itens: { include: { produto: { include: { item: true } } } },
     },
-    orderBy: [{ dataEntrega: "asc" }, { id: "asc" }],
   });
+  pedidos.sort(porDataDeEntrega); // horário de entrega, depois número
 
   // O que separar pras entregas do dia
   const separar = listaDeSeparacao(pedidos);
@@ -45,22 +49,23 @@ export default async function Pedidos({ searchParams }: PageProps<"/painel/pedid
 
       <PedidosQueChegaram />
 
-      <nav className="mb-4 flex flex-wrap gap-2 text-sm">
-        <Link href={`${rota}?dia=${dia}`} className={`etiqueta px-3 py-1 ${!filtroStatus ? "bg-marca-800 text-white" : "bg-white text-stone-600 ring-1 ring-stone-200"}`}>
-          Todos
-        </Link>
-        {Object.entries(STATUS_PEDIDO).map(([chave, rotulo]) => (
-          <Link
-            key={chave}
-            href={`${rota}?dia=${dia}&status=${chave}`}
-            className={`etiqueta px-3 py-1 ${filtroStatus === chave ? "bg-marca-800 text-white" : "bg-white text-stone-600 ring-1 ring-stone-200"}`}
-          >
-            {rotulo}
-          </Link>
-        ))}
+      {/* filtro em controle segmentado: só os status que o painel usa hoje + os antigos que ainda existirem no dia */}
+      <nav className="sem-rolagem mb-4 inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-stone-200/50 p-1 text-sm">
+        {([["", "Todos"], ...FILTROS.map((c) => [c, STATUS_PEDIDO[c]])] as [string, string][]).map(([chave, rotulo]) => {
+          const ativo = (filtroStatus ?? "") === chave;
+          return (
+            <Link
+              key={chave || "todos"}
+              href={chave ? `${rota}?dia=${dia}&status=${chave}` : `${rota}?dia=${dia}`}
+              className={`rounded-lg px-3.5 py-1.5 whitespace-nowrap transition-[background-color,color,box-shadow] duration-150 ${ativo ? "bg-white font-medium text-marca-950 shadow-[0_1px_2px_rgb(41_28_18/0.1)]" : "text-stone-600 hover:text-marca-950"}`}
+            >
+              {rotulo}
+            </Link>
+          );
+        })}
       </nav>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px] [&>*]:min-w-0">
+      <div className="grid gap-6 2xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
         <div className="cartao overflow-x-auto">
           {pedidos.length === 0 ? (
             <div className="p-5">
@@ -76,6 +81,7 @@ export default async function Pedidos({ searchParams }: PageProps<"/painel/pedid
                   <th className="px-4 py-3 text-right">Itens</th>
                   <th className="px-4 py-3 text-right">Total</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="w-px px-4 py-3"><span className="sr-only">Excluir</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -93,6 +99,9 @@ export default async function Pedidos({ searchParams }: PageProps<"/painel/pedid
                     <td className="tabular px-4 py-3 text-right">{reais(p.total)}</td>
                     <td className="px-4 py-3">
                       <Etiqueta status={p.status}>{STATUS_PEDIDO[p.status as StatusPedido]}</Etiqueta>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <ExcluirPedido id={p.id} />
                     </td>
                   </tr>
                 ))}

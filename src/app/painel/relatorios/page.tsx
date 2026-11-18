@@ -1,3 +1,4 @@
+import { CampoData } from "@/components/campo-data";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, Minus } from "lucide-react";
@@ -77,7 +78,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
           </Link>
           <form action="/painel/relatorios" className="contents">
             <input type="hidden" name="periodo" value={periodo} />
-            <input type="date" name="dia" defaultValue={dia} className="campo w-auto" aria-label="Escolher data" />
+            <CampoData name="dia" defaultValue={dia} className="campo w-auto" aria-label="Escolher data" />
             <button className="botao-secundario">Ir</button>
           </form>
           <Link href={link(periodo, r.proximo)} className="botao-secundario px-2" aria-label="Próximo período">

@@ -2,10 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { FORMAS_PAGAMENTO, PRAZOS_PAGAMENTO, TIPOS_NEGOCIO } from "@/lib/constantes";
-import { diaISO } from "@/lib/datas";
+import { PAGAMENTOS_RAPIDO } from "@/lib/constantes";
 import { db } from "@/lib/db";
-import { buscarNegocio, linkPermitido, type DadosNegocio } from "@/lib/google-negocio";
+import { buscarNegocio, type DadosNegocio } from "@/lib/google-negocio";
 import { exigirPapel } from "@/lib/sessao";
 
 export type EstadoCadastro = { erro?: string; ok?: number; id?: string; nome?: string };
@@ -17,75 +16,49 @@ const valor = (v: FormDataEntryValue | null) => {
   return t === "" ? null : Number(t.replace(/[^\d,.-]/g, "").replace(",", "."));
 };
 
+// Cadastro rápido (pedido do dono em 2026-11-17): só o essencial pra lançar a carteira de uma vez.
+// Tipo de comércio, região, valores da caixa e saldo em aberto ficam pra ficha do cliente.
+const TIPO_A_DEFINIR = "A definir";
+
 const esquema = z.object({
   nomeFantasia: z.string().min(2, "Informe o nome do cliente").max(80),
-  tipoNegocio: z.enum(TIPOS_NEGOCIO, "Escolha o tipo de comércio"),
-  whatsapp: z.string().regex(/^[\d\s()+-]{8,20}$/, "Telefone inválido"),
-  responsavel: z.string().max(80).nullable(),
-  endereco: z.string().min(3, "Informe o endereço").max(200),
-  bairro: z.string().max(80).nullable(),
-  cidade: z.string().min(2, "Informe a cidade").max(60),
-  cep: z.string().regex(/^\d{5}-?\d{3}$/, "CEP inválido (ex: 90035-100)").nullable(),
-  lat: z.number().min(-34).max(6).nullable(),
-  lng: z.number().min(-75).max(-28).nullable(),
-  linkMaps: z.string().max(500).refine(linkPermitido, "Link do Google inválido").nullable(),
-  regiaoId: z.string().nullable(),
-  formaPagamento: z.enum(FORMAS_PAGAMENTO, "Escolha a forma de pagamento"),
-  prazoPagamentoDias: z.number().int().refine((n) => (PRAZOS_PAGAMENTO as readonly number[]).includes(n), "Prazo inválido"),
-  notaFiscal: z.boolean(),
-  valorVenda: z.number("Valor de venda inválido").positive("Valor de venda inválido").max(100000).nullable(),
-  valorCusto: z.number("Valor de custo inválido").positive("Valor de custo inválido").max(100000).nullable(),
-  saldoAberto: z.number("Valor em aberto inválido").min(0, "Valor em aberto inválido").max(1000000).nullable(),
-  vencimentoSaldo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
-  observacoes: z.string().max(1000).nullable(),
+  pagamento: z.enum(PAGAMENTOS_RAPIDO, "Escolha a forma de pagamento"),
+  endereco: z.string().max(200).nullable(),
+  whatsapp: z.string().regex(/^[\d\s()+-]{8,20}$/, "Telefone inválido").nullable(),
 });
+
+export async function cadastrarClienteRapido(_e: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+  await exigirPapel("DIRETOR");
+  const r = esquema.safeParse({
+    nomeFantasia: texto(form.get("nomeFantasia")) ?? "",
+    pagamento: texto(form.get("pagamento")),
+    endereco: texto(form.get("endereco")),
+    whatsapp: texto(form.get("whatsapp")),
+  });
+  if (!r.success) return { erro: r.error.issues[0].message };
+  const { nomeFantasia, pagamento, endereco, whatsapp } = r.data;
+
+  if (await db.cliente.findFirst({ where: { nomeFantasia } })) return { erro: `Já existe um cliente chamado ${nomeFantasia}` };
+
+  const nf = pagamento === "NF";
+  const cliente = await db.cliente.create({
+    data: {
+      nomeFantasia,
+      razaoSocial: nomeFantasia,
+      tipoNegocio: TIPO_A_DEFINIR, // a ficha pede o tipo certo na primeira edição
+      endereco,
+      whatsapp,
+      formaPagamento: nf ? null : pagamento,
+      notaFiscal: nf,
+    },
+  });
+  revalidatePath("/painel", "layout");
+  return { ok: Date.now(), id: cliente.id, nome: cliente.nomeFantasia };
+}
 
 /** Caixa do ovo branco: o valor de venda do cliente vira o preço combinado dela */
 async function produtoCaixaBranco() {
   return db.produto.findFirst({ where: { unidade: "caixa", ativo: true, item: { nome: "Ovo branco" } } });
-}
-
-export async function cadastrarClienteRapido(_e: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
-  const usuario = await exigirPapel("DIRETOR");
-  const r = esquema.safeParse({
-    nomeFantasia: texto(form.get("nomeFantasia")) ?? "",
-    tipoNegocio: texto(form.get("tipoNegocio")),
-    whatsapp: texto(form.get("whatsapp")) ?? "",
-    responsavel: texto(form.get("responsavel")),
-    endereco: texto(form.get("endereco")) ?? "",
-    bairro: texto(form.get("bairro")),
-    cidade: texto(form.get("cidade")) ?? "Porto Alegre",
-    cep: texto(form.get("cep")),
-    lat: valor(form.get("lat")),
-    lng: valor(form.get("lng")),
-    linkMaps: texto(form.get("linkMaps")),
-    regiaoId: texto(form.get("regiaoId")),
-    formaPagamento: texto(form.get("formaPagamento")),
-    prazoPagamentoDias: Number(form.get("prazoPagamentoDias") ?? 0),
-    notaFiscal: form.get("notaFiscal") === "1",
-    valorVenda: valor(form.get("valorVenda")),
-    valorCusto: valor(form.get("valorCusto")),
-    saldoAberto: valor(form.get("saldoAberto")),
-    vencimentoSaldo: texto(form.get("vencimentoSaldo")),
-    observacoes: texto(form.get("observacoes")),
-  });
-  if (!r.success) return { erro: r.error.issues[0].message };
-  const { saldoAberto, vencimentoSaldo, ...dados } = r.data;
-  if (dados.lat === null || dados.lng === null) [dados.lat, dados.lng] = [null, null];
-
-  if (await db.cliente.findFirst({ where: { nomeFantasia: dados.nomeFantasia } })) return { erro: `Já existe um cliente chamado ${dados.nomeFantasia}` };
-
-  const caixa = dados.valorVenda ? await produtoCaixaBranco() : null;
-  const cliente = await db.$transaction(async (tx) => {
-    const c = await tx.cliente.create({ data: { ...dados, razaoSocial: dados.nomeFantasia, prazoPagamentoDias: dados.prazoPagamentoDias || null } });
-    if (caixa && dados.valorVenda) await tx.precoCliente.create({ data: { clienteId: c.id, produtoId: caixa.id, preco: dados.valorVenda } });
-    if (saldoAberto) {
-      await tx.cobranca.create({ data: { clienteId: c.id, valor: saldoAberto, vencimento: vencimentoSaldo ?? diaISO(), descricao: `Saldo em aberto lançado no cadastro por ${usuario.nome}` } });
-    }
-    return c;
-  });
-  revalidatePath("/painel", "layout");
-  return { ok: Date.now(), id: cliente.id, nome: cliente.nomeFantasia };
 }
 
 export type ResultadoBusca = { erro?: string; dados?: DadosNegocio; existente?: { id: string; nome: string } | null };

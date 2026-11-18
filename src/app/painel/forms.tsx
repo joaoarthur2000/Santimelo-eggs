@@ -1,5 +1,6 @@
 "use client";
 
+import { CampoData } from "@/components/campo-data";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { CIDADES, DIAS_SEMANA, FORMAS_PAGAMENTO, PRAZOS_PAGAMENTO, TIPOS_NEGOCIO } from "@/lib/constantes";
 import {
@@ -379,7 +380,7 @@ export function FormAgendarPreco({ produtos, amanha }: { produtos: { id: string;
         </label>
         <label className="text-xs text-stone-500">
           A partir de
-          <input name="aPartirDe" type="date" required min={amanha} defaultValue={amanha} className="campo mt-1" />
+          <CampoData name="aPartirDe" required min={amanha} defaultValue={amanha} className="campo mt-1" />
         </label>
       </div>
       <button disabled={enviando} className="botao-primario w-full">Agendar preço</button>

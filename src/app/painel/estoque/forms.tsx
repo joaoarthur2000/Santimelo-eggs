@@ -1,6 +1,8 @@
 "use client";
 
+import { CampoData } from "@/components/campo-data";
 import { useActionState, useEffect, useRef, useState } from "react";
+import { reais } from "@/lib/formato";
 import { registrarCompra, registrarContagem, registrarPerda } from "./actions";
 
 export type OpcaoItem = { id: string; nome: string; codigo: string | null; unidade: string; categoria: string };
@@ -30,12 +32,57 @@ function SeletorItem({ itens, valor, onChange }: { itens: OpcaoItem[]; valor: st
   );
 }
 
+// "130", "130,50", "1.250,00" → número; vazio ou inválido = null
+const numero = (v: string) => {
+  const t = v.trim().replace(/\s/g, "");
+  if (!t) return null;
+  const n = Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** Data do lançamento: calendário ou digitada (dd/mm/aaaa). Serve pra lançar compra/perda antiga. */
+function DataDoLancamento({ hoje, rotulo, valor, onChange }: { hoje: string; rotulo: string; valor: string; onChange: (v: string) => void }) {
+  return (
+    <label className="block text-xs text-stone-500">
+      {rotulo}
+      <CampoData name="dia" required value={valor} onChange={onChange} max={hoje} min="2020-01-01" className="campo mt-1" />
+    </label>
+  );
+}
+
+/** Quantidade × custo da caixa, com o total calculado sozinho */
+function ValoresCompra({ abrev }: { abrev: string }) {
+  const [qtd, setQtd] = useState("");
+  const [custo, setCusto] = useState("");
+  const q = numero(qtd);
+  const c = numero(custo);
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs text-stone-500">
+          Quantidade ({abrev})
+          <input name="quantidade" inputMode="decimal" required placeholder="0" value={qtd} onChange={(e) => setQtd(e.target.value)} className="campo mt-1" />
+        </label>
+        <label className="text-xs text-stone-500">
+          Valor por {abrev} (R$)
+          <input name="custoUnit" inputMode="decimal" required placeholder="0,00" value={custo} onChange={(e) => setCusto(e.target.value)} className="campo mt-1" />
+        </label>
+      </div>
+      <p className="flex items-baseline justify-between rounded-xl bg-gema-400/15 px-4 py-3">
+        <span className="text-sm text-stone-600">Total da compra</span>
+        <span className="tabular text-xl font-extrabold text-marca-950">{q && c ? reais(q * c) : "R$ 0,00"}</span>
+      </p>
+    </>
+  );
+}
+
 /** Compra, perda ou contagem, em abas */
 export type OpcaoFornecedor = { id: string; nome: string };
 
-export function FormMovimento({ itens, fornecedores, itemInicial = "" }: { itens: OpcaoItem[]; fornecedores: OpcaoFornecedor[]; itemInicial?: string }) {
+export function FormMovimento({ itens, fornecedores, hoje, itemInicial = "" }: { itens: OpcaoItem[]; fornecedores: OpcaoFornecedor[]; hoje: string; itemInicial?: string }) {
   const [aba, setAba] = useState<keyof typeof ACOES>("compra");
   const [itemId, setItemId] = useState(itemInicial);
+  const [dia, setDia] = useState(hoje); // fica entre um lançamento e outro: facilita lançar várias compras antigas
   const [estado, acao, enviando] = useActionState<Estado, FormData>(ACOES[aba], {});
   const ref = useRef<HTMLFormElement>(null);
   const unidade = itens.find((i) => i.id === itemId)?.unidade ?? itens[0]?.unidade ?? "caixa";
@@ -58,20 +105,8 @@ export function FormMovimento({ itens, fornecedores, itemInicial = "" }: { itens
         <SeletorItem itens={itens} valor={itemId} onChange={setItemId} />
         {aba === "compra" && (
           <>
-            <div className="grid grid-cols-3 gap-2">
-              <label className="text-xs text-stone-500">
-                Quantidade ({abrev})
-                <input name="quantidade" inputMode="decimal" required placeholder="0" className="campo mt-1" />
-              </label>
-              <label className="text-xs text-stone-500">
-                Custo por {abrev} (R$)
-                <input name="custoUnit" inputMode="decimal" placeholder="0,00" className="campo mt-1" />
-              </label>
-              <label className="text-xs text-stone-500">
-                ou total (R$)
-                <input name="custoTotal" inputMode="decimal" placeholder="0,00" className="campo mt-1" />
-              </label>
-            </div>
+            <DataDoLancamento hoje={hoje} rotulo="Data da compra" valor={dia} onChange={setDia} />
+            <ValoresCompra key={estado.ok ?? 0} abrev={abrev} />
             <select name="fornecedorId" required defaultValue="" className="campo">
               <option value="" disabled>Fornecedor…</option>
               {fornecedores.map((f) => (
@@ -83,6 +118,7 @@ export function FormMovimento({ itens, fornecedores, itemInicial = "" }: { itens
         )}
         {aba === "perda" && (
           <>
+            <DataDoLancamento hoje={hoje} rotulo="Data da perda" valor={dia} onChange={setDia} />
             <label className="block text-xs text-stone-500">
               Quantidade perdida ({abrev})
               <input name="quantidade" inputMode="decimal" required placeholder="0" className="campo mt-1" />

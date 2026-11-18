@@ -1,5 +1,6 @@
 "use client";
 
+import { CampoData } from "@/components/campo-data";
 import { useActionState, useEffect, useRef } from "react";
 import { CATEGORIAS_DESPESA, FORMAS_PAGAMENTO } from "@/lib/constantes";
 import { lancarDespesa } from "./actions";
@@ -21,7 +22,7 @@ export function FormDespesa({ hoje }: { hoje: string }) {
         </label>
         <label className="text-xs text-stone-500">
           Data
-          <input name="dia" type="date" required defaultValue={hoje} className="campo mt-1" />
+          <CampoData name="dia" required defaultValue={hoje} className="campo mt-1" />
         </label>
       </div>
       <div className="grid grid-cols-2 gap-2">

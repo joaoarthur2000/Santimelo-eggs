@@ -43,29 +43,46 @@
 }
 
 body {
-  background: #faf7f2;
-  color: #2a1d12;
+  background: #f7f5f1;
+  color: #1f1611;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgb(255 189 82 / 0.35);
+}
+
+/* Movimento: curvas suaves e curtas. Só opacity/transform (roda na GPU, 60fps) */
+@theme {
+  --ease-suave: cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow-cartao: 0 1px 2px rgb(41 28 18 / 0.04), 0 0 0 1px rgb(41 28 18 / 0.02);
+  --shadow-flutua: 0 12px 32px -12px rgb(41 28 18 / 0.18), 0 2px 6px rgb(41 28 18 / 0.05);
 }
 
 @layer components {
   .campo {
-    @apply w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-marca-600 focus:ring-2 focus:ring-marca-200;
+    @apply w-full rounded-[10px] border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 shadow-[0_1px_2px_rgb(41_28_18/0.04)] outline-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-stone-400 hover:border-stone-300 focus:border-marca-500 focus:ring-4 focus:ring-marca-500/10 disabled:bg-stone-50 disabled:text-stone-400;
   }
   /* campo que veio preenchido do Google: amarelo Gema de Ovo até alguém mexer */
   .campo-auto {
     @apply border-ouro bg-ouro/10;
   }
   .botao-primario {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-marca-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-marca-700 disabled:opacity-60;
+    @apply inline-flex items-center justify-center gap-2 rounded-[10px] bg-marca-900 px-4 py-2 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.1),0_1px_2px_rgb(41_28_18/0.3)] transition-[background-color,transform,box-shadow] duration-150 ease-out select-none hover:bg-marca-800 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-marca-500/25 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50;
   }
   .botao-secundario {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-60;
+    @apply inline-flex items-center justify-center gap-2 rounded-[10px] border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-[0_1px_2px_rgb(41_28_18/0.04)] transition-[background-color,border-color,transform,color] duration-150 ease-out select-none hover:border-stone-300 hover:bg-stone-50 hover:text-stone-900 active:scale-[0.97] focus-visible:ring-4 focus-visible:ring-marca-500/15 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50;
   }
   .cartao {
-    @apply rounded-xl border border-stone-200 bg-white;
+    @apply rounded-2xl border border-stone-200/80 bg-white shadow-cartao;
+  }
+  /* cartão clicável: sobe 1px e ganha sombra ao passar o mouse */
+  .cartao-link {
+    @apply transition-[transform,box-shadow,border-color] duration-200 ease-suave hover:-translate-y-px hover:border-stone-300/80 hover:shadow-flutua;
   }
   .etiqueta {
-    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
   }
 
   /* App EGGS */
@@ -170,4 +187,129 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .eggs-entra, .eggs-pula, .eggs-balanca, .eggs-brilho, .eggs-ginga, .eggs-pulo { animation: none; }
   .eggs-confete { display: none; }
+}
+
+/* ───────── Painel da equipe ───────── */
+@layer base {
+  .painel table thead th {
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .painel table tbody tr {
+    transition: background-color 120ms ease-out;
+  }
+  .painel table tbody tr:hover {
+    background-color: rgb(250 247 242);
+  }
+  .painel :where(a, button, summary, [role="tab"]):focus-visible {
+    outline: 2px solid rgb(163 130 106 / 0.6);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+}
+
+/* rolagem fina e discreta */
+.painel * {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(120 100 85 / 0.3) transparent;
+}
+.sem-rolagem {
+  scrollbar-width: none;
+}
+.sem-rolagem::-webkit-scrollbar {
+  display: none;
+}
+
+/* Entrada da tela: o conteúdo sobe 6px e aparece, em cascata curta (só na troca de tela) */
+@keyframes painel-sobe {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.painel-entra > * {
+  animation: painel-sobe 380ms var(--ease-suave) backwards;
+}
+.painel-entra > *:nth-child(2) { animation-delay: 40ms; }
+.painel-entra > *:nth-child(3) { animation-delay: 80ms; }
+.painel-entra > *:nth-child(4) { animation-delay: 120ms; }
+.painel-entra > *:nth-child(n + 5) { animation-delay: 160ms; }
+
+/* O esqueleto só aparece se a tela demorar mais de 0,25 s: navegação rápida não pisca "carregando" */
+@keyframes painel-aparece {
+  from { opacity: 0; }
+}
+.painel-entra > .carregando-atrasado {
+  animation: painel-aparece 200ms ease-out 250ms backwards;
+}
+
+/* Esqueleto enquanto a próxima tela carrega: brilho correndo (transform, sem repintar) */
+@keyframes painel-brilho {
+  to { transform: translateX(100%); }
+}
+.esqueleto {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgb(231 225 217 / 0.6);
+}
+.esqueleto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  animation: painel-brilho 1.3s ease-in-out infinite;
+}
+
+/* Bolinha "ao vivo" / novidade pulsando */
+@keyframes painel-pulso {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+.pulso {
+  position: relative;
+}
+.pulso::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: painel-pulso 1.8s var(--ease-suave) infinite;
+}
+
+/* Janela modal (<dialog>): sobe e aparece; o fundo escurece. Fecha com Esc ou clique fora */
+.dialogo {
+  margin: auto;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  border-radius: 20px;
+  background: #fff;
+  color: inherit;
+  box-shadow: 0 30px 80px -20px rgb(31 20 14 / 0.45), 0 0 0 1px rgb(31 20 14 / 0.06);
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transition: opacity 180ms ease-out, transform 260ms var(--ease-suave), overlay 260ms allow-discrete, display 260ms allow-discrete;
+}
+.dialogo[open] {
+  opacity: 1;
+  transform: none;
+}
+@starting-style {
+  .dialogo[open] { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+.dialogo::backdrop {
+  background: rgb(20 12 8 / 0);
+  transition: background-color 200ms ease-out, overlay 200ms allow-discrete, display 200ms allow-discrete;
+}
+.dialogo[open]::backdrop {
+  background: rgb(20 12 8 / 0.45);
+}
+@starting-style {
+  .dialogo[open]::backdrop { background: rgb(20 12 8 / 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .painel-entra > *, .esqueleto::after, .pulso::before { animation: none; }
+  .dialogo, .dialogo::backdrop { transition: none; }
+  .cartao-link, .botao-primario, .botao-secundario { transition: none; }
 }

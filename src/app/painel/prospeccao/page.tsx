@@ -173,8 +173,8 @@ export default async function Prospeccao({ searchParams }: PageProps<"/painel/pr
             <h2 className="font-semibold text-marca-950">Buscar no Google</h2>
             <p className="mb-3 mt-1 text-xs text-stone-500">Vai bairro por bairro e já tira fechados, grandes redes, quem não tem telefone e quem já é cliente.</p>
             {!temChave && (
-              <p className="mb-3 rounded-lg bg-gema-100 px-3 py-2 text-xs text-casca-900">
-                Falta a chave do Google: coloque <code>GOOGLE_PLACES_API_KEY</code> no <code>.env</code> do EGGS e reinicie. O passo a passo está em <code>prospeccao-bot/README.md</code>.
+              <p className="mb-3 rounded-xl bg-ouro/15 px-3 py-2.5 text-xs text-terra ring-1 ring-ouro/40 ring-inset">
+                A busca automática no Google ainda não foi ativada (precisa da chave do Google da empresa). Enquanto isso, cadastre os estabelecimentos à mão.
               </p>
             )}
             <FormBusca tipos={TIPOS_PROSPECCAO} regioes={NOMES_REGIOES} temChave={temChave} />

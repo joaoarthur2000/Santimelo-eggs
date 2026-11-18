@@ -15,8 +15,9 @@ export const STATUS_PEDIDO = {
 } as const;
 export type StatusPedido = keyof typeof STATUS_PEDIDO;
 
-// Ordem do fluxo de um pedido (o botão "avançar" segue essa sequência)
-export const FLUXO_PEDIDO: StatusPedido[] = ["NOVO", "SEPARACAO", "ENTREGA", "ENTREGUE"];
+// Fluxo do pedido no painel (pedido do dono em 2026-11-17): Novo → Entregue, sem etapas no meio.
+// "Em separação" e "Saiu pra entrega" ficam só pra ler pedidos antigos.
+export const FLUXO_PEDIDO: StatusPedido[] = ["NOVO", "ENTREGUE"];
 
 export const ORIGENS_PEDIDO = {
   APP: "App EGGS",
@@ -58,6 +59,11 @@ export const CIDADES = [
 /** Condição de pagamento: 0 = à vista (na entrega); o resto é prazo em dias depois da entrega */
 export const PRAZOS_PAGAMENTO = [0, 7, 14, 21, 28, 30] as const;
 export const FORMAS_PAGAMENTO = ["Pix", "Dinheiro", "Boleto", "Cartão", "Transferência"] as const;
+// cadastro rápido de cliente: NF = fatura com nota fiscal (grava notaFiscal, sem forma de pagamento)
+// Como a Santimelo pagou o fornecedor
+export const FORMAS_PAGAMENTO_FORNECEDOR = ["Pix", "Dinheiro"] as const;
+
+export const PAGAMENTOS_RAPIDO = ["Pix", "Dinheiro", "NF"] as const;
 export const condicaoPagamento = (prazo: number | null | undefined) => (prazo ? `A prazo · ${prazo} dias` : "À vista");
 
 /** Ovos são contados em caixas; o camarão, em pacotes de 800 g */

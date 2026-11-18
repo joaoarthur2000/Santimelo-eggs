@@ -48,3 +48,6 @@ prisma/*.db-journal
 
 # cópias de segurança do banco local
 prisma/backups/
+
+# log do servidor de produção (ligado em segundo plano)
+servidor.log

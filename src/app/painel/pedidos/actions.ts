@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { FLUXO_PEDIDO, STATUS_PEDIDO } from "@/lib/constantes";
-import { inicioDoDia } from "@/lib/datas";
+import { STATUS_PEDIDO } from "@/lib/constantes";
+import { diaISO, inicioDoDia } from "@/lib/datas";
 import { sincronizarCobranca } from "@/lib/eggs";
 import { sincronizarBaixaDoPedido } from "@/lib/estoque";
 import { exigirPapel } from "@/lib/sessao";
@@ -44,11 +44,41 @@ export async function mudarStatus(id: number, status: string) {
   revalidatePath(`/painel/pedidos/${id}`);
 }
 
+/** Pedido aberto → Entregue (o painel só tem esse passo; pedidos antigos "Em separação"/"Saiu pra entrega" também fecham direto) */
 export async function avancarStatus(id: number) {
   await exigirPapel("DIRETOR");
   const pedido = await db.pedido.findUniqueOrThrow({ where: { id } });
-  const i = FLUXO_PEDIDO.indexOf(pedido.status as (typeof FLUXO_PEDIDO)[number]);
-  if (i >= 0 && i < FLUXO_PEDIDO.length - 1) await mudarStatus(id, FLUXO_PEDIDO[i + 1]);
+  if (pedido.status !== "ENTREGUE" && pedido.status !== "CANCELADO") await mudarStatus(id, "ENTREGUE");
+}
+
+/** Escolhe de qual fornecedor saíram as caixas de um item (pedidos do app chegam sem). Refaz a baixa do estoque. */
+export async function definirFornecedorItem(itemId: string, fornecedorId: string) {
+  const usuario = await exigirPapel("DIRETOR");
+  const item = await db.pedidoItem.findUnique({ where: { id: itemId } });
+  if (!item) return;
+  if (fornecedorId && !(await db.fornecedor.findUnique({ where: { id: fornecedorId } }))) return;
+  await db.pedidoItem.update({ where: { id: itemId }, data: { fornecedorId: fornecedorId || null } });
+  await sincronizarBaixaDoPedido(item.pedidoId, usuario.nome);
+  revalidatePath("/painel", "layout");
+}
+
+/**
+ * Apaga o pedido de vez (lançado errado). Vão junto: itens, baixa no estoque (as caixas voltam) e a cobrança em aberto.
+ * Pedido já pago: o pagamento sai junto, então só exclui com `mesmoPago` (a tela pede uma segunda confirmação).
+ */
+export async function excluirPedido(id: number, voltarProDia = false, mesmoPago = false): Promise<{ erro?: string; pago?: number }> {
+  await exigirPapel("DIRETOR");
+  const pedido = await db.pedido.findUnique({ where: { id }, include: { cobranca: true } });
+  if (!pedido) return { erro: "Esse pedido já foi excluído." };
+  if (pedido.cobranca?.pagoEm && !mesmoPago) return { pago: pedido.cobranca.valor };
+  await db.$transaction([
+    db.mensagem.deleteMany({ where: { chave: { startsWith: `status:${id}:` } } }),
+    db.pedido.delete({ where: { id } }),
+  ]);
+  revalidatePath("/painel", "layout");
+  revalidatePath("/eggs", "layout");
+  if (voltarProDia) redirect(`/painel/pedidos?dia=${diaISO(pedido.dataEntrega)}`);
+  return {};
 }
 
 const esquemaPedido = z.object({
@@ -56,7 +86,17 @@ const esquemaPedido = z.object({
   dia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   origem: z.enum(["WHATSAPP", "PAINEL"]),
   observacao: z.string().max(500).optional(),
-  itens: z.array(z.object({ produtoId: z.string(), quantidade: z.number().positive() })).min(1, "Adicione pelo menos um produto"),
+  itens: z
+    .array(
+      z.object({
+        produtoId: z.string(),
+        quantidade: z.number().positive(),
+        // valor da caixa no dia (muda por cliente e por dia); sem valor, vale o combinado ou o de tabela
+        precoUnit: z.number("Valor inválido").positive("Valor inválido").max(100000).optional(),
+        fornecedorId: z.string().nullable().optional(),
+      }),
+    )
+    .min(1, "Adicione pelo menos um produto"),
 });
 
 export type NovoPedido = z.infer<typeof esquemaPedido>;
@@ -66,19 +106,28 @@ export async function criarPedido(dados: NovoPedido): Promise<{ erro?: string }>
   const r = esquemaPedido.safeParse(dados);
   if (!r.success) return { erro: r.error.issues[0].message };
 
-  // Preço sempre do banco, nunca do navegador: o combinado com o cliente ou o de tabela
+  // Valor: o digitado no pedido (só o painel lança por aqui); sem ele, o combinado com o cliente ou o de tabela
   const ids = r.data.itens.map((i) => i.produtoId);
-  const [produtos, cliente, especiais] = await Promise.all([
+  const idsFornecedor = [...new Set(r.data.itens.map((i) => i.fornecedorId).filter((f): f is string => !!f))];
+  const [produtos, cliente, especiais, fornecedores] = await Promise.all([
     db.produto.findMany({ where: { id: { in: ids }, ativo: true } }),
     db.cliente.findUnique({ where: { id: r.data.clienteId }, select: { notaFiscal: true } }),
     db.precoCliente.findMany({ where: { clienteId: r.data.clienteId, produtoId: { in: ids } } }),
+    db.fornecedor.findMany({ where: { id: { in: idsFornecedor } }, select: { id: true } }),
   ]);
+  if (fornecedores.length !== idsFornecedor.length) return { erro: "Fornecedor não encontrado" };
   const preco = new Map(produtos.map((p) => [p.id, especiais.find((e) => e.produtoId === p.id)?.preco ?? p.preco]));
   const itens = r.data.itens
     .filter((i) => preco.has(i.produtoId))
     .map((i) => {
-      const precoUnit = preco.get(i.produtoId)!;
-      return { produtoId: i.produtoId, quantidade: i.quantidade, precoUnit, subtotal: Math.round(precoUnit * i.quantidade * 100) / 100 };
+      const precoUnit = Math.round((i.precoUnit ?? preco.get(i.produtoId)!) * 100) / 100;
+      return {
+        produtoId: i.produtoId,
+        quantidade: i.quantidade,
+        precoUnit,
+        subtotal: Math.round(precoUnit * i.quantidade * 100) / 100,
+        fornecedorId: i.fornecedorId || null,
+      };
     });
   if (itens.length === 0) return { erro: "Nenhum produto válido no pedido" };
 
