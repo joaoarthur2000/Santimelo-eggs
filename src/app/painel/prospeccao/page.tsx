@@ -75,7 +75,7 @@ export default async function Prospeccao({ searchParams }: PageProps<"/painel/pr
 
   return (
     <>
-      <Cabecalho titulo="Prospecção" subtitulo="Estabelecimentos pra virar cliente: busca no Google por tipo e região, chama no WhatsApp com a mensagem pronta e acompanha até fechar." />
+      <Cabecalho titulo="Prospecção" explica subtitulo="Estabelecimentos pra virar cliente: busca no Google por tipo e região, chama no WhatsApp com a mensagem pronta e acompanha até fechar." />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4 [&>*]:min-w-0">
         <Indicador rotulo="Sem contato" valor={num(conta(["NOVO"]))} detalhe="na fila pra chamar" />

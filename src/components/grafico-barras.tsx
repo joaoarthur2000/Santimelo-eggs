@@ -1,5 +1,6 @@
 "use client";
 
+import { useEstreito } from "./use-estreito";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export type Serie = { chave: string; rotulo: string; cor: string };
@@ -24,6 +25,7 @@ type Props = {
 export function GraficoBarras({ dados, categoria, series, formato = "num", horizontal = false, empilhado = false, altura = 260 }: Props) {
   const fmt = FORMATOS[formato];
   const eixoTexto = { fontSize: 12, fill: "#57534e" };
+  const estreito = useEstreito();
 
   return (
     <div>
@@ -38,17 +40,17 @@ export function GraficoBarras({ dados, categoria, series, formato = "num", horiz
         </ul>
       )}
       <ResponsiveContainer width="100%" height={altura}>
-        <BarChart data={dados} layout={horizontal ? "vertical" : "horizontal"} margin={{ top: 4, right: 12, bottom: 0, left: 0 }} barCategoryGap="20%">
+        <BarChart data={estreito && !horizontal ? dados.slice(-14) : dados} layout={horizontal ? "vertical" : "horizontal"} margin={{ top: 4, right: estreito ? 4 : 12, bottom: 0, left: 0 }} barCategoryGap="20%">
           <CartesianGrid stroke="#e7e5e4" vertical={horizontal} horizontal={!horizontal} />
           {horizontal ? (
             <>
               <XAxis type="number" tickFormatter={fmt} tick={eixoTexto} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey={categoria} width={150} tick={eixoTexto} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey={categoria} width={estreito ? 104 : 150} tick={eixoTexto} axisLine={false} tickLine={false} />
             </>
           ) : (
             <>
               <XAxis dataKey={categoria} tick={eixoTexto} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={fmt} tick={eixoTexto} axisLine={false} tickLine={false} width={72} />
+              <YAxis tickFormatter={fmt} tick={eixoTexto} axisLine={false} tickLine={false} width={estreito ? 52 : 72} />
             </>
           )}
           <Tooltip

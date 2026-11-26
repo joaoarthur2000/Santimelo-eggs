@@ -2,7 +2,8 @@
 
 import { CampoData } from "@/components/campo-data";
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useState, type FormEvent, type RefObject } from "react";
+import { useFormulario } from "@/components/formulario";
 import { PAGAMENTOS_RAPIDO } from "@/lib/constantes";
 import { cadastrarClienteRapido, lancarEmAberto, salvarValoresCaixa, type EstadoCadastro } from "./actions";
 
@@ -23,15 +24,15 @@ function MargemAoVivo({ venda, custo }: { venda: string; custo: string }) {
 }
 
 export function FormClienteRapido() {
-  const [estado, acao, enviando] = useActionState<EstadoCadastro, FormData>(cadastrarClienteRapido, {});
+  const { estado, enviando, ref, aoEnviar } = useFormulario<EstadoCadastro>(cadastrarClienteRapido, {});
   // a cada cliente salvo o formulário nasce de novo, vazio, pronto pro próximo
-  return <CamposCliente key={estado.ok ?? 0} estado={estado} acao={acao} enviando={enviando} />;
+  return <CamposCliente key={estado.ok ?? 0} estado={estado} formulario={ref} aoEnviar={aoEnviar} enviando={enviando} />;
 }
 
-function CamposCliente({ estado, acao, enviando }: { estado: EstadoCadastro; acao: (f: FormData) => void; enviando: boolean }) {
+function CamposCliente({ estado, formulario, aoEnviar, enviando }: { estado: EstadoCadastro; formulario: RefObject<HTMLFormElement | null>; aoEnviar: (e: FormEvent<HTMLFormElement>) => void; enviando: boolean }) {
   const rotulo = "block text-sm font-medium text-stone-700";
   return (
-    <form action={acao} className="space-y-4">
+    <form ref={formulario} onSubmit={aoEnviar} className="space-y-4">
       {estado.ok && estado.id && (
         <p className="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-900" role="status">
           <b>{estado.nome}</b> cadastrado. <Link href={`/painel/clientes/${estado.id}`} className="font-semibold underline">Abrir ficha</Link> ou continue com o próximo.
@@ -77,12 +78,12 @@ function CamposCliente({ estado, acao, enviando }: { estado: EstadoCadastro; aca
 
 /** Ficha do cliente: valores da caixa */
 export function FormValoresCaixa({ clienteId, venda, custo }: { clienteId: string; venda: number | null; custo: number | null }) {
-  const [estado, acao, enviando] = useActionState<EstadoCadastro, FormData>(salvarValoresCaixa.bind(null, clienteId), {});
+  const { estado, enviando, ref, aoEnviar } = useFormulario<EstadoCadastro>(salvarValoresCaixa.bind(null, clienteId), {});
   const f = (v: number | null) => (v ? String(v.toFixed(2)).replace(".", ",") : "");
   const [v, setV] = useState(f(venda));
   const [c, setC] = useState(f(custo));
   return (
-    <form action={acao} className="space-y-3">
+    <form ref={ref} onSubmit={aoEnviar} className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs text-stone-500">Venda da caixa (R$)<input name="valorVenda" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} className="campo mt-1" /></label>
         <label className="text-xs text-stone-500">Custo da caixa (R$)<input name="valorCusto" inputMode="decimal" value={c} onChange={(e) => setC(e.target.value)} className="campo mt-1" /></label>
@@ -99,11 +100,9 @@ export function FormValoresCaixa({ clienteId, venda, custo }: { clienteId: strin
 
 /** Ficha do cliente: lançar valor em aberto avulso */
 export function FormEmAberto({ clienteId, hoje }: { clienteId: string; hoje: string }) {
-  const [estado, acao, enviando] = useActionState<EstadoCadastro, FormData>(lancarEmAberto.bind(null, clienteId), {});
-  const ref = useRef<HTMLFormElement>(null);
-  useEffect(() => { if (estado.ok) ref.current?.reset(); }, [estado.ok]);
+  const { estado, enviando, ref, aoEnviar } = useFormulario<EstadoCadastro>(lancarEmAberto.bind(null, clienteId), {}, { limpar: true });
   return (
-    <form ref={ref} action={acao} className="space-y-2">
+    <form ref={ref} onSubmit={aoEnviar} className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <input name="valor" inputMode="decimal" required placeholder="Valor (R$)" className="campo" />
         <CampoData name="vencimento" required defaultValue={hoje} className="campo" />

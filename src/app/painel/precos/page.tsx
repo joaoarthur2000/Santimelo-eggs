@@ -27,7 +27,7 @@ export default async function PrecosOvos() {
 
   return (
     <>
-      <Cabecalho titulo="Preços" subtitulo="Preço de venda já com a margem. Agende mudanças com antecedência: o cliente vê no app antes de valer." />
+      <Cabecalho titulo="Preços" explica subtitulo="Preço de venda já com a margem. Agende mudanças com antecedência: o cliente vê no app antes de valer." />
       {esperando.length > 0 && (
         <section className="mb-6 rounded-2xl border border-ouro bg-ouro/10 p-5">
           <h2 className="font-semibold text-terra">Esperando preço</h2>
@@ -39,7 +39,7 @@ export default async function PrecosOvos() {
       )}
       <div className="grid gap-6 xl:grid-cols-[1fr_380px] [&>*]:min-w-0">
         <section className="cartao overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="lista-cel w-full text-sm">
             <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
               <tr>
                 <th className="px-4 py-3">Produto</th>
@@ -54,14 +54,14 @@ export default async function PrecosOvos() {
                 const c = custo.has(p.itemId) && p.fatorEstoque ? custo.get(p.itemId)! * p.fatorEstoque : null;
                 return (
                   <tr key={p.id}>
-                    <td className="px-4 py-3">
+                    <td data-c="t" className="px-4 py-3">
                       {nomeProduto(p)}
-                      {p._count.precosCliente > 0 && <span className="block text-xs text-stone-500">{p._count.precosCliente} clientes com preço combinado</span>}
+                      {p._count.precosCliente > 0 && <span className="block text-xs font-normal text-stone-500">{p._count.precosCliente} clientes com preço combinado</span>}
                     </td>
-                    <td className="tabular px-4 py-3 text-right font-semibold">{reais(p.preco)}</td>
-                    <td className="tabular px-4 py-3 text-right">{c !== null ? reais(c) : "—"}</td>
-                    <td className="tabular px-4 py-3 text-right">{c !== null && p.preco > 0 ? pct((p.preco - c) / p.preco) : "—"}</td>
-                    <td className="px-4 py-3 text-xs text-stone-500">{p.precos.map((h) => `${reais(h.preco)} (${formatarDataCurta(h.em)})`).join(" ← ")}</td>
+                    <td data-c="v" className="tabular px-4 py-3 text-right font-semibold">{reais(p.preco)}</td>
+                    <td data-c="p" data-r="Custo médio" className="tabular px-4 py-3 text-right">{c !== null ? reais(c) : "—"}</td>
+                    <td data-c="p" data-r="Margem" className="tabular px-4 py-3 text-right">{c !== null && p.preco > 0 ? pct((p.preco - c) / p.preco) : "—"}</td>
+                    <td data-c="x" className="px-4 py-3 text-xs text-stone-500">{p.precos.map((h) => `${reais(h.preco)} (${formatarDataCurta(h.em)})`).join(" ← ")}</td>
                   </tr>
                 );
               })}
@@ -85,7 +85,7 @@ export default async function PrecosOvos() {
                     </span>
                   </span>
                   <form action={cancelarAgendado.bind(null, a.id)}>
-                    <button className="text-xs text-stone-400 hover:text-red-600">cancelar</button>
+                    <button className="toque text-xs text-stone-500 hover:text-red-600">cancelar</button>
                   </form>
                 </li>
               ))}

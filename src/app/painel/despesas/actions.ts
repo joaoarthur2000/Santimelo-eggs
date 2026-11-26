@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { CATEGORIAS_DESPESA, FORMAS_PAGAMENTO } from "@/lib/constantes";
 import { db } from "@/lib/db";
+import { errosDoForm } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 
-type Estado = { erro?: string; ok?: number };
+type Estado = { erro?: string; ok?: number; campos?: Record<string, string> };
 const texto = (v: FormDataEntryValue | null) => String(v ?? "").trim() || null;
 // "140,50" e "140.50" valem 140,5 (igual ao estoque)
 const numero = (v: FormDataEntryValue | null) => (v === null || String(v).trim() === "" ? undefined : Number(String(v).trim().replace(",", ".")));
@@ -28,7 +29,7 @@ export async function lancarDespesa(_e: Estado, form: FormData): Promise<Estado>
     valor: numero(form.get("valor")),
     formaPagamento: texto(form.get("formaPagamento")),
   });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   await db.despesa.create({ data: { ...r.data, autor: usuario.nome } });
   revalidatePath("/painel", "layout");
   return { ok: Date.now() };

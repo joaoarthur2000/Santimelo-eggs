@@ -2,16 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { FORMAS_PAGAMENTO, PRAZOS_PAGAMENTO, TIPOS_NEGOCIO } from "@/lib/constantes";
+import { FORMAS_PAGAMENTO } from "@/lib/constantes";
 import { criarAcesso, loginUnico, qrDeAcesso, senhaUnica } from "@/lib/acesso";
+import { avisosDoCadastro, faltaNoCadastro } from "@/lib/cadastro";
 import { diaISO } from "@/lib/datas";
 import { db } from "@/lib/db";
 import { CONFIG, gravarConfig } from "@/lib/config";
+import { linkPermitido } from "@/lib/google-negocio";
 import { gerarHash } from "@/lib/senha";
 import { exigirPapel } from "@/lib/sessao";
 import { enviarProGrupo } from "@/lib/whatsapp";
 
-type Estado = { erro?: string; ok?: number; senha?: string; codigo?: string };
+type Estado = { erro?: string; ok?: number; senha?: string; codigo?: string; campos?: Record<string, string>; avisos?: Record<string, string>; falta?: string[] };
 const texto = (v: FormDataEntryValue | null) => String(v ?? "").trim() || null;
 const numero = (v: FormDataEntryValue | null) => (texto(v) === null ? null : Number(String(v).replace(",", ".")));
 
@@ -20,123 +22,77 @@ function atualizar() {
   revalidatePath("/eggs", "layout");
 }
 
-const opcional = (max: number) => z.string().max(max).nullable();
-const esquemaCondicoes = z.object({
-  regiaoId: z.string().nullable(),
-  prazoPagamentoDias: z.number("Prazo inválido").int("Prazo inválido").min(0, "Prazo inválido").max(120, "Prazo inválido").nullable(),
-  formaPagamento: z.enum(FORMAS_PAGAMENTO, "Escolha a forma de pagamento"),
-  notaFiscal: z.boolean(),
-  negociacao: opcional(1000),
-});
+// Cadastro de cliente: faltar informação nunca impede de salvar (pedido do dono em 2026-11-25). Só o nome é preciso.
+// Texto entra como foi digitado; número que não dá pra ler fica de fora (o valor anterior continua) e vira aviso.
+const corta = (v: FormDataEntryValue | null, max: number) => texto(v)?.slice(0, max) ?? null;
+const tipoOuADefinir = (v: FormDataEntryValue | null) => corta(v, 40) ?? "A definir"; // tipo antigo, fora da lista, continua valendo
+const formaOuNada = (v: FormDataEntryValue | null) => FORMAS_PAGAMENTO.find((f) => f === texto(v));
 
-// Dados que a Santimelo precisa do cliente
-const esquemaDados = z.object({
-  nomeFantasia: z.string("Informe o nome do estabelecimento").min(2, "Informe o nome do estabelecimento").max(80),
-  razaoSocial: opcional(120),
-  cnpj: z.string().regex(/^[\d./-]{11,18}$/, "CNPJ/CPF inválido").nullable(),
-  tipoNegocio: z.enum(TIPOS_NEGOCIO, "Escolha o tipo de negócio"),
-  responsavel: z.string("Informe o responsável").min(2, "Informe o responsável").max(80),
-  whatsapp: z.string("Informe o WhatsApp").regex(/^[\d\s()+-]{10,20}$/, "WhatsApp inválido"),
-  email: z.email("E-mail inválido").nullable(),
-  endereco: z.string("Informe o endereço de entrega").min(5, "Informe o endereço de entrega").max(200),
-  bairro: z.string("Informe o bairro").min(2, "Informe o bairro").max(80),
-  cidade: z.string("Informe a cidade").min(2, "Informe a cidade").max(60),
-  cep: z.string().regex(/^\d{5}-?\d{3}$/, "CEP inválido").nullable(),
-  consumoSemanal: z.number("Consumo inválido").min(0).max(1000).nullable(),
-  limiteCredito: z.number("Limite inválido").min(0).max(1000000).nullable(),
-  observacoes: opcional(1000),
-});
+function lerNumero(form: FormData, nome: string, max: number, avisos: Record<string, string>) {
+  const t = texto(form.get(nome));
+  if (!t) return null;
+  const n = Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
+  if (Number.isFinite(n) && n >= 0 && n <= max) return n;
+  avisos[nome] = "Não entendi esse número, então não salvei";
+  return undefined; // não mexe no que já estava
+}
 
-const lerCondicoes = (form: FormData) =>
-  esquemaCondicoes.safeParse({
+function lerCondicoes(form: FormData) {
+  const prazo = texto(form.get("prazoPagamentoDias"));
+  const dias = prazo === null ? null : Number(prazo);
+  return {
     regiaoId: texto(form.get("regiaoId")),
-    prazoPagamentoDias: numero(form.get("prazoPagamentoDias")),
-    formaPagamento: texto(form.get("formaPagamento")),
+    prazoPagamentoDias: dias === null || (Number.isInteger(dias) && dias >= 0 && dias <= 120) ? dias : undefined,
+    formaPagamento: formaOuNada(form.get("formaPagamento")),
     notaFiscal: form.get("notaFiscal") === "1",
-    negociacao: texto(form.get("negociacao")),
-  });
+    negociacao: corta(form.get("negociacao"), 1000),
+  };
+}
 
-const lerDados = (form: FormData) =>
-  esquemaDados.safeParse({
-    nomeFantasia: texto(form.get("nomeFantasia")),
-    razaoSocial: texto(form.get("razaoSocial")),
-    cnpj: texto(form.get("cnpj")),
-    tipoNegocio: texto(form.get("tipoNegocio")),
-    responsavel: texto(form.get("responsavel")),
-    whatsapp: texto(form.get("whatsapp")),
-    email: texto(form.get("email"))?.toLowerCase() ?? null,
-    endereco: texto(form.get("endereco")),
-    bairro: texto(form.get("bairro")),
-    cidade: texto(form.get("cidade")),
-    cep: texto(form.get("cep")),
-    consumoSemanal: numero(form.get("consumoSemanal")),
-    limiteCredito: numero(form.get("limiteCredito")),
-    observacoes: texto(form.get("observacoes")),
-  });
+// Dados que a Santimelo guarda do cliente
+function lerDados(form: FormData) {
+  const textos = {
+    razaoSocial: corta(form.get("razaoSocial"), 120),
+    cnpj: corta(form.get("cnpj"), 18),
+    responsavel: corta(form.get("responsavel"), 80),
+    whatsapp: corta(form.get("whatsapp"), 20),
+    email: corta(form.get("email"), 120)?.toLowerCase() ?? null,
+    bairro: corta(form.get("bairro"), 80),
+    cidade: corta(form.get("cidade"), 60),
+    cep: corta(form.get("cep"), 9),
+    observacoes: corta(form.get("observacoes"), 1000),
+  };
+  const avisos = avisosDoCadastro(textos);
+  const dados = {
+    ...textos,
+    tipoNegocio: tipoOuADefinir(form.get("tipoNegocio")),
+    consumoSemanal: lerNumero(form, "consumoSemanal", 1000, avisos),
+    limiteCredito: lerNumero(form, "limiteCredito", 1000000, avisos),
+  };
+  return { dados, avisos };
+}
 
-// Cadastro rápido (tela Novo cliente): o mínimo obrigatório, o resto opcional
-const esquemaCadastro = z.object({
-  tipoNegocio: z.enum(TIPOS_NEGOCIO, "Escolha o tipo de negócio"),
-  nomeFantasia: z.string("Qual o nome do estabelecimento?").min(2, "Qual o nome do estabelecimento?").max(80),
-  responsavel: z.string("Quem cuida dos pedidos?").min(2, "Quem cuida dos pedidos?").max(80),
-  whatsapp: z.string("Informe o WhatsApp").regex(/^[\d\s()+-]{10,20}$/, "WhatsApp inválido"),
-  cep: z.string("Informe o CEP").regex(/^\d{5}-?\d{3}$/, "CEP inválido"),
-  rua: z.string("Informe a rua").min(3, "Informe a rua").max(120),
-  numero: z.string("Informe o número").min(1, "Informe o número").max(10),
-  complemento: opcional(60),
-  bairro: z.string("Informe o bairro").min(2, "Informe o bairro").max(80),
-  cidade: z.string("Informe a cidade").min(2, "Informe a cidade").max(60),
-  regiaoId: z.string().nullable(),
-  prazoPagamentoDias: z.number().refine((d) => (PRAZOS_PAGAMENTO as readonly number[]).includes(d), "Escolha a condição de pagamento"),
-  formaPagamento: z.enum(FORMAS_PAGAMENTO, "Escolha a forma de pagamento"),
-  notaFiscal: z.boolean(),
-  razaoSocial: opcional(120),
-  cnpj: z.string().regex(/^[\d./-]{11,18}$/, "CNPJ/CPF inválido").nullable(),
-  email: z.email("E-mail inválido").nullable(),
-  consumoSemanal: z.number("Consumo inválido").min(0).max(1000).nullable(),
-  limiteCredito: z.number("Limite inválido").min(0).max(1000000).nullable(),
-  negociacao: opcional(1000),
-  observacoes: opcional(1000),
-});
-
-export type Cadastro = { erro?: string; clienteId?: string; nome?: string; responsavel?: string; whatsapp?: string; login?: string; senha?: string; qr?: string };
+export type Cadastro = { erro?: string; campos?: Record<string, string>; falta?: string[]; clienteId?: string; nome?: string; responsavel?: string; whatsapp?: string; login?: string; senha?: string; qr?: string };
 
 /** Cadastra o cliente (fica no painel e no app ao mesmo tempo) e, se pedido, já libera o app com login e senha */
 export async function cadastrarCliente(_e: Cadastro, form: FormData): Promise<Cadastro> {
   await exigirPapel("DIRETOR");
-  const r = esquemaCadastro.safeParse({
-    tipoNegocio: texto(form.get("tipoNegocio")),
-    nomeFantasia: texto(form.get("nomeFantasia")),
-    responsavel: texto(form.get("responsavel")),
-    whatsapp: texto(form.get("whatsapp")),
-    cep: texto(form.get("cep")),
-    rua: texto(form.get("rua")),
-    numero: texto(form.get("numero")),
-    complemento: texto(form.get("complemento")),
-    bairro: texto(form.get("bairro")),
-    cidade: texto(form.get("cidade")),
-    regiaoId: texto(form.get("regiaoId")),
-    prazoPagamentoDias: numero(form.get("prazoPagamentoDias")),
-    formaPagamento: texto(form.get("formaPagamento")),
-    notaFiscal: form.get("notaFiscal") === "1",
-    razaoSocial: texto(form.get("razaoSocial")),
-    cnpj: texto(form.get("cnpj")),
-    email: texto(form.get("email"))?.toLowerCase() ?? null,
-    consumoSemanal: numero(form.get("consumoSemanal")),
-    limiteCredito: numero(form.get("limiteCredito")),
-    negociacao: texto(form.get("negociacao")),
-    observacoes: texto(form.get("observacoes")),
-  });
-  if (!r.success) return { erro: r.error.issues[0].message };
-  const { rua, numero: num, complemento, ...d } = r.data;
+  const nomeFantasia = corta(form.get("nomeFantasia"), 80);
+  if (!nomeFantasia) return { erro: "Escreva pelo menos o nome do cliente.", campos: { nomeFantasia: "Escreva o nome do cliente" } };
+  const { dados } = lerDados(form);
+  const condicoes = lerCondicoes(form);
+  const rua = corta(form.get("rua"), 120);
+  const num = corta(form.get("numero"), 10);
+  const complemento = corta(form.get("complemento"), 60);
+  const endereco = [[rua, num].filter(Boolean).join(", "), complemento].filter(Boolean).join(" - ") || null;
 
   const cliente = await db.cliente.create({
-    data: { ...d, endereco: `${rua}, ${num}${complemento ? ` - ${complemento}` : ""}`, razaoSocial: d.razaoSocial ?? d.nomeFantasia },
+    data: { ...dados, ...condicoes, nomeFantasia, endereco, razaoSocial: dados.razaoSocial ?? nomeFantasia },
   });
   const acesso = form.get("liberarApp") === "1" ? await criarAcesso(cliente.id) : null;
   atualizar();
   return {
-    clienteId: cliente.id, nome: cliente.nomeFantasia, responsavel: cliente.responsavel ?? "", whatsapp: cliente.whatsapp ?? "",
+    clienteId: cliente.id, nome: cliente.nomeFantasia, responsavel: cliente.responsavel ?? "", whatsapp: cliente.whatsapp ?? "", falta: faltaNoCadastro(cliente),
     ...acesso, ...(acesso && { qr: await qrDeAcesso(acesso.login) }),
   };
 }
@@ -152,26 +108,38 @@ export async function liberarApp(clienteId: string): Promise<Estado> {
 
 export async function salvarCondicoes(clienteId: string, _e: Estado, form: FormData): Promise<Estado> {
   await exigirPapel("DIRETOR");
-  const r = lerCondicoes(form);
-  if (!r.success) return { erro: r.error.issues[0].message };
-  await db.cliente.update({ where: { id: clienteId }, data: r.data });
+  await db.cliente.update({ where: { id: clienteId }, data: lerCondicoes(form) });
   atualizar();
   return { ok: Date.now() };
 }
 
+/** Posição exata e link do Maps, quando a ficha foi preenchida pelo Google */
+function doGoogle(form: FormData) {
+  const lat = numero(form.get("lat"));
+  const lng = numero(form.get("lng"));
+  const link = texto(form.get("linkMaps"));
+  return {
+    ...(lat !== null && lng !== null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : {}),
+    ...(link && link.length <= 500 && linkPermitido(link) ? { linkMaps: link } : {}),
+  };
+}
+
 export async function salvarDados(clienteId: string, _e: Estado, form: FormData): Promise<Estado> {
   await exigirPapel("DIRETOR");
-  const r = lerDados(form);
-  if (!r.success) return { erro: r.error.issues[0].message };
+  const { dados, avisos } = lerDados(form);
+  const endereco = corta(form.get("endereco"), 200);
+  const nome = corta(form.get("nomeFantasia"), 80);
+  if (!nome) avisos.nomeFantasia = "Deixei o nome que já estava";
   // endereço mudou: apaga a posição e a próxima rota localiza de novo. Não mudou: mantém (pode ser a posição exata do Google)
-  const antes = await db.cliente.findUnique({ where: { id: clienteId }, select: { endereco: true, bairro: true, cidade: true } });
-  const mudou = !antes || antes.endereco !== (r.data.endereco ?? null) || antes.bairro !== (r.data.bairro ?? null) || antes.cidade !== (r.data.cidade ?? null);
-  await db.cliente.update({
+  const antes = await db.cliente.findUnique({ where: { id: clienteId }, select: { nomeFantasia: true, endereco: true, bairro: true, cidade: true } });
+  if (!antes) return { erro: "Esse cliente não existe mais." };
+  const mudou = antes.endereco !== endereco || antes.bairro !== dados.bairro || antes.cidade !== dados.cidade;
+  const cliente = await db.cliente.update({
     where: { id: clienteId },
-    data: { ...r.data, razaoSocial: r.data.razaoSocial ?? r.data.nomeFantasia, ...(mudou ? { lat: null, lng: null } : {}) },
+    data: { ...dados, endereco, nomeFantasia: nome ?? undefined, razaoSocial: dados.razaoSocial ?? nome ?? antes.nomeFantasia, ...(mudou ? { lat: null, lng: null } : {}), ...doGoogle(form) },
   });
   atualizar();
-  return { ok: Date.now() };
+  return { ok: Date.now(), avisos, falta: faltaNoCadastro(cliente) };
 }
 
 /** Senha nova (mostrada uma vez só). Quem não tinha código ganha um; também desbloqueia */

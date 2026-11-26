@@ -29,8 +29,8 @@ export const ORIGENS_PEDIDO = {
 // pra estabelecimentos e pro consumidor final, em Porto Alegre e região (atualizado em 2026-11-09)
 export const TIPOS_NEGOCIO = ["Padaria", "Confeitaria", "Restaurante", "Lancheria", "Mercado", "Consumidor final"] as const;
 
-// Entregas: terças e quintas, das 05h às 11h
-export const DIAS_ENTREGA = [2, 4] as const;
+// Entregas: segundas, terças e sextas, das 05h às 11h (desde 2026-11-19)
+export const DIAS_ENTREGA = [1, 2, 5] as const;
 export const HORARIO_ENTREGA = "05h às 11h";
 
 // Gastos da operação fora a compra de mercadoria. Tudo do carro (combustível, manutenção, IPVA...) fica em Veículos

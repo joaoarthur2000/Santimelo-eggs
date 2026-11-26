@@ -1,25 +1,25 @@
-import { CampoData } from "@/components/campo-data";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { formatarDia, somarDias } from "@/lib/datas";
+import { formatarDia } from "@/lib/datas";
 
-export function Cabecalho({ titulo, subtitulo, children }: { titulo: string; subtitulo?: string; children?: React.ReactNode }) {
+export { SeletorDia } from "./seletor-dia";
+
+/** `explica`: o subtítulo só explica a tela (no celular some, pra sobrar espaço). `acoesNoCelular`: falso esconde os botões no celular */
+export function Cabecalho({ titulo, subtitulo, explica = false, acoesNoCelular = true, children }: { titulo: string; subtitulo?: string; explica?: boolean; acoesNoCelular?: boolean; children?: React.ReactNode }) {
   return (
-    <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] text-marca-950">{titulo}</h1>
-        {subtitulo && <p className="mt-1.5 max-w-3xl text-sm text-stone-500 first-letter:uppercase">{subtitulo}</p>}
+    <header className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 lg:mb-7 lg:gap-4">
+      <div className="min-w-0 max-lg:w-full">
+        <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.02em] text-balance text-marca-950 lg:text-[26px]">{titulo}</h1>
+        {subtitulo && <p className={`mt-1.5 max-w-3xl text-sm text-stone-500 first-letter:uppercase ${explica ? "max-lg:hidden" : ""}`}>{subtitulo}</p>}
       </div>
-      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+      {children && <div className={`flex flex-wrap items-center gap-2 max-lg:w-full ${acoesNoCelular ? "" : "max-lg:hidden"}`}>{children}</div>}
     </header>
   );
 }
 
 export function Indicador({ rotulo, valor, detalhe }: { rotulo: string; valor: string; detalhe?: string }) {
   return (
-    <div className="cartao p-5">
-      <p className="text-[11px] font-semibold tracking-[0.08em] text-stone-500 uppercase">{rotulo}</p>
-      <p className="tabular mt-2 text-[26px] leading-none font-semibold tracking-[-0.02em] text-marca-950">{valor}</p>
+    <div className="cartao p-4 lg:p-5">
+      <p className="text-[11px] font-semibold tracking-[0.08em] text-stone-500 uppercase max-lg:text-sm max-lg:font-medium">{rotulo}</p>
+      <p className="tabular mt-2 text-[22px] leading-none font-semibold tracking-[-0.02em] text-marca-950 lg:text-[26px]">{valor}</p>
       {detalhe && <p className="mt-2 text-xs text-stone-500">{detalhe}</p>}
     </div>
   );
@@ -27,24 +27,6 @@ export function Indicador({ rotulo, valor, detalhe }: { rotulo: string; valor: s
 
 export function Vazio({ children }: { children: React.ReactNode }) {
   return <p className="rounded-2xl border border-dashed border-stone-200 bg-stone-50/60 px-6 py-10 text-center text-sm text-stone-500">{children}</p>;
-}
-
-/** Navegação ‹ dia › que preserva a rota atual via ?dia= */
-export function SeletorDia({ dia, rota }: { dia: string; rota: string }) {
-  return (
-    <div className="flex items-center gap-1">
-      <Link href={`${rota}?dia=${somarDias(dia, -1)}`} className="botao-secundario px-2" aria-label="Dia anterior">
-        <ChevronLeft className="size-4" />
-      </Link>
-      <form action={rota} className="contents">
-        <CampoData name="dia" defaultValue={dia} className="campo w-auto" aria-label="Escolher data" />
-        <button className="botao-secundario">Ir</button>
-      </form>
-      <Link href={`${rota}?dia=${somarDias(dia, 1)}`} className="botao-secundario px-2" aria-label="Próximo dia">
-        <ChevronRight className="size-4" />
-      </Link>
-    </div>
-  );
 }
 
 export function tituloDia(dia: string) {

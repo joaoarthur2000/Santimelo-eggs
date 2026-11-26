@@ -1,13 +1,17 @@
 "use client";
 
 import { CampoData } from "@/components/campo-data";
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { useFormulario } from "@/components/formulario";
 import { Banknote, QrCode } from "lucide-react";
 import { FORMAS_PAGAMENTO_FORNECEDOR } from "@/lib/constantes";
 import { reais } from "@/lib/formato";
-import { lancarCompra, registrarPagamento, type Estado } from "./actions";
+import { editarCompra, lancarCompra, registrarPagamento, type Estado } from "./actions";
 
 type Opcao = { id: string; nome: string };
+/** Compra já lançada, pra editar */
+export type CompraAtual = { id: string; fornecedorId: string | null; fornecedor: string | null; itemId: string; item: string; marca: string | null; quantidade: number; custoUnit: number | null };
+const comoTexto = (v: number) => String(v).replace(".", ",");
 
 // "185", "185,50", "1.250,00" → número; vazio ou inválido = null
 const numero = (v: string) => {
@@ -18,9 +22,9 @@ const numero = (v: string) => {
 };
 
 /** Quantidade × valor da caixa, com o total na hora. Nasce vazio a cada compra salva. */
-function Valores() {
-  const [caixas, setCaixas] = useState("");
-  const [valor, setValor] = useState("");
+function Valores({ compra }: { compra?: CompraAtual }) {
+  const [caixas, setCaixas] = useState(compra ? comoTexto(compra.quantidade) : "");
+  const [valor, setValor] = useState(compra?.custoUnit != null ? compra.custoUnit.toFixed(2).replace(".", ",") : "");
   const q = numero(caixas);
   const v = numero(valor);
   return (
@@ -43,15 +47,41 @@ function Valores() {
   );
 }
 
-export function FormCompra({ fornecedores, itens, marcas, hoje }: { fornecedores: Opcao[]; itens: Opcao[]; marcas: string[]; hoje: string }) {
-  const [estado, acao, enviando] = useActionState<Estado, FormData>(lancarCompra, {});
+export function FormCompra({
+  fornecedores: ativos,
+  itens: tipos,
+  marcas,
+  hoje,
+  dia = hoje,
+  compra,
+  aoSalvar,
+}: {
+  fornecedores: Opcao[];
+  itens: Opcao[];
+  marcas: string[];
+  hoje: string;
+  /** dia que já vem preenchido */
+  dia?: string;
+  /** edita essa compra em vez de lançar outra */
+  compra?: CompraAtual;
+  aoSalvar?: () => void;
+}) {
+  const { estado, enviando, ref, aoEnviar } = useFormulario<Estado>(async (e, form) => {
+    const r = compra ? await editarCompra(compra.id, e, form) : await lancarCompra(e, form);
+    if (r.ok && !r.erro) aoSalvar?.();
+    return r;
+  }, {}, { limpar: !compra });
+  // fornecedor ou tipo desativado continua aparecendo na compra antiga
+  const fornecedores = compra?.fornecedorId && !ativos.some((f) => f.id === compra.fornecedorId) ? [...ativos, { id: compra.fornecedorId, nome: compra.fornecedor ?? "Fornecedor" }] : ativos;
+  const itens = compra && !tipos.some((i) => i.id === compra.itemId) ? [...tipos, { id: compra.itemId, nome: compra.item }] : tipos;
   const rotulo = "text-xs font-medium text-stone-600";
   if (fornecedores.length === 0) return <p className="text-sm text-stone-500">Cadastre um fornecedor primeiro.</p>;
   return (
-    <form action={acao} className="space-y-3">
+    <form ref={ref} onSubmit={aoEnviar} className="space-y-3">
       <label className={`${rotulo} block`}>
         Fornecedor
-        <select name="fornecedorId" required defaultValue={fornecedores[0].id} className="campo mt-1">
+        <select name="fornecedorId" required defaultValue={compra ? (compra.fornecedorId ?? "") : fornecedores[0].id} className="campo mt-1">
+          {compra && !compra.fornecedorId && <option value="">Escolha…</option>}
           {fornecedores.map((f) => (
             <option key={f.id} value={f.id}>{f.nome}</option>
           ))}
@@ -60,11 +90,11 @@ export function FormCompra({ fornecedores, itens, marcas, hoje }: { fornecedores
       <div className="grid gap-3">
         <label className={rotulo}>
           Data que pegou
-          <CampoData name="dia" required defaultValue={hoje} max={hoje} className="campo mt-1" />
+          <CampoData name="dia" required defaultValue={dia} max={hoje} className="campo mt-1" />
         </label>
         <label className={rotulo}>
-          Tipo de ovo
-          <select name="itemId" required defaultValue={itens[0]?.id} className="campo mt-1">
+          Produto
+          <select name="itemId" required defaultValue={compra?.itemId ?? itens[0]?.id} className="campo mt-1">
             {itens.map((i) => (
               <option key={i.id} value={i.id}>{i.nome}</option>
             ))}
@@ -72,17 +102,17 @@ export function FormCompra({ fornecedores, itens, marcas, hoje }: { fornecedores
         </label>
       </div>
       <label className={`${rotulo} block`}>
-        Marca dos ovos
-        <input name="marca" list="marcas-ovo" maxLength={60} placeholder="Ex: Granja Boa Vista" className="campo mt-1" />
+        Marca
+        <input name="marca" list="marcas-ovo" maxLength={60} defaultValue={compra?.marca ?? ""} placeholder="Ex: Granja Boa Vista" className="campo mt-1" />
         <datalist id="marcas-ovo">
           {marcas.map((m) => (
             <option key={m} value={m} />
           ))}
         </datalist>
       </label>
-      <Valores key={estado.ok ?? 0} />
+      <Valores key={estado.ok ?? 0} compra={compra} />
       <div className="flex flex-wrap items-center gap-3">
-        <button disabled={enviando} className="botao-primario">{enviando ? "Salvando…" : "Lançar compra"}</button>
+        <button disabled={enviando} className="botao-primario">{enviando ? "Salvando…" : compra ? "Salvar alterações" : "Lançar compra"}</button>
         {estado.erro && <p className="text-sm text-red-600" role="alert">{estado.erro}</p>}
         {estado.ok && !estado.erro && <p className="text-sm text-marca-700" role="status">Compra lançada.</p>}
       </div>
@@ -92,9 +122,9 @@ export function FormCompra({ fornecedores, itens, marcas, hoje }: { fornecedores
 
 /** No cartão do fornecedor: registra quanto foi pago a ele (abate do "A pagar") */
 export function FormPagamento({ fornecedorId, hoje }: { fornecedorId: string; hoje: string }) {
-  const [estado, acao, enviando] = useActionState<Estado, FormData>(registrarPagamento.bind(null, fornecedorId), {});
+  const { estado, enviando, ref, aoEnviar } = useFormulario<Estado>(registrarPagamento.bind(null, fornecedorId), {});
   return (
-    <form key={estado.ok ?? 0} action={acao} className="space-y-1.5">
+    <form key={estado.ok ?? 0} ref={ref} onSubmit={aoEnviar} className="space-y-1.5">
       <p className="text-xs font-medium text-stone-600">Registrar pagamento a ele</p>
       {/* sem padrão marcado: obriga a escolher, pra não lançar Pix que foi dinheiro */}
       <div role="radiogroup" aria-label="Como foi pago" className="grid grid-cols-2 gap-1 rounded-[10px] bg-stone-100 p-1">
@@ -103,14 +133,14 @@ export function FormPagamento({ fornecedorId, hoje }: { fornecedorId: string; ho
           return (
             <label key={f} className="cursor-pointer">
               <input type="radio" name="forma" value={f} required className="peer sr-only" />
-              <span className="flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-sm text-stone-500 transition-[background-color,color,box-shadow] duration-150 peer-checked:bg-white peer-checked:font-semibold peer-checked:text-marca-950 peer-checked:shadow-[0_1px_2px_rgb(41_28_18/0.12)] peer-focus-visible:ring-2 peer-focus-visible:ring-marca-500/30 hover:text-marca-950">
+              <span className="flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-sm max-lg:py-3 text-stone-500 transition-[background-color,color,box-shadow] duration-150 peer-checked:bg-white peer-checked:font-semibold peer-checked:text-marca-950 peer-checked:shadow-[0_1px_2px_rgb(41_28_18/0.12)] peer-focus-visible:ring-2 peer-focus-visible:ring-marca-500/30 hover:text-marca-950">
                 <Icone className="size-4" strokeWidth={1.75} /> {f}
               </span>
             </label>
           );
         })}
       </div>
-      <div className="grid grid-cols-[1fr_1.4fr] gap-2">
+      <div className="grid grid-cols-[1fr_1.4fr] gap-2 max-lg:my-2">
         <input name="valor" required inputMode="decimal" placeholder="Valor (R$)" aria-label="Valor pago" className="campo py-1.5" />
         <CampoData name="dia" required defaultValue={hoje} max={hoje} aria-label="Data do pagamento" className="campo py-1.5" />
       </div>

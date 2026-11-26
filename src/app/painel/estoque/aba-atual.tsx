@@ -65,7 +65,7 @@ export async function AbaAtual() {
   return (
     <>
       {/* Número grande: quanto tem agora */}
-      <section className="relative overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#2b1c15_0%,#402924_60%,#4a2f22_100%)] p-6 text-white shadow-flutua sm:p-8">
+      <section className="relative overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#2b1c15_0%,#402924_60%,#4a2f22_100%)] p-5 text-white shadow-flutua sm:p-8">
         <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-ouro/20 blur-3xl" aria-hidden />
         <div className="relative grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-end">
           <div>
@@ -88,11 +88,11 @@ export async function AbaAtual() {
               { rotulo: "Saiu (7 dias)", valor: `${num(redondo(saiu7))} cx`, icone: ArrowUpFromLine, nota: "vendas entregues" },
             ].map(({ rotulo, valor, icone: Icone, nota }) => (
               <div key={rotulo} className="rounded-2xl bg-white/[0.06] p-4 ring-1 ring-white/10 ring-inset">
-                <dt className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-white/55 uppercase">
+                <dt className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-white/55 uppercase max-lg:text-[13px] max-lg:text-white/70">
                   <Icone className="size-3.5" /> {rotulo}
                 </dt>
                 <dd className="tabular mt-1.5 text-xl font-semibold tracking-tight">{valor}</dd>
-                <dd className="text-[11px] text-white/40">{nota}</dd>
+                <dd className="text-[11px] text-white/40 max-lg:text-[13px] max-lg:text-white/60">{nota}</dd>
               </div>
             ))}
           </dl>
@@ -157,7 +157,7 @@ export async function AbaAtual() {
 
                 <footer className="mt-auto flex items-center justify-between gap-2 pt-5">
                   <EditarEstoque item={{ id: l.item.id, nome: l.item.nome }} saldo={l.saldo} abrev={abrev(un)} fornecedores={l.fornecedores} hoje={hoje} />
-                  <Link href={`/painel/estoque?aba=movimentos&item=${l.item.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-marca-700 transition-colors hover:text-marca-950">
+                  <Link href={`/painel/estoque?aba=movimentos&item=${l.item.id}`} className="toque inline-flex items-center gap-1 text-sm font-medium text-marca-700 transition-colors hover:text-marca-950">
                     Extrato <ArrowRight className="size-3.5" />
                   </Link>
                 </footer>
@@ -168,7 +168,7 @@ export async function AbaAtual() {
         </section>
 
         <aside className="space-y-6">
-          <section className="cartao p-5">
+          <section id="lancar" className="cartao scroll-mt-24 p-5">
             <h2 className="font-semibold text-marca-950">Lançar entrada</h2>
             <p className="mt-0.5 mb-4 text-xs text-stone-500">Compra que chegou, perda ou contagem. Pode ser de dias atrás.</p>
             <FormMovimento

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Map, MapPinOff, Plus } from "lucide-react";
+import { AcoesContato } from "@/components/contato";
 import { Cabecalho, Etiqueta } from "@/components/ui";
 import { STATUS_PEDIDO, type StatusPedido } from "@/lib/constantes";
 import { diaDaSemana, diaISO, diaValido, formatarDia, somarDias } from "@/lib/datas";
@@ -54,15 +55,15 @@ export default async function Rotas({ searchParams }: PageProps<"/painel/rotas">
 
   return (
     <>
-      <Cabecalho titulo="Rotas e entregas" subtitulo="As entregas de cada dia saem dos pedidos. Gere a rota: ordem das paradas, km e combustível da Fiorino.">
+      <Cabecalho titulo="Rotas e entregas" explica subtitulo="As entregas de cada dia saem dos pedidos. Gere a rota: ordem das paradas, km e combustível da Fiorino.">
         <Link href={`/painel/pedidos/novo?dia=${dia}`} className="botao-primario">
           <Plus className="size-4" /> Adicionar entrega
         </Link>
       </Cabecalho>
 
       {/* Semana */}
-      <nav className="mb-6 flex items-stretch gap-2 overflow-x-auto pb-1">
-        <Link href={`/painel/rotas?dia=${somarDias(segunda, -7)}`} className="botao-secundario shrink-0 px-2" aria-label="Semana anterior">
+      <nav className="mb-5 flex items-stretch gap-1 pb-1 lg:mb-6 lg:gap-2 lg:overflow-x-auto">
+        <Link href={`/painel/rotas?dia=${somarDias(segunda, -7)}`} className="botao-secundario shrink-0 px-2 max-lg:min-w-9! max-lg:px-0!" aria-label="Semana anterior">
           <ChevronLeft className="size-4" />
         </Link>
         {semana.map((d, n) => {
@@ -73,17 +74,20 @@ export default async function Rotas({ searchParams }: PageProps<"/painel/rotas">
             <Link
               key={d}
               href={`/painel/rotas?dia=${d}`}
-              className={`min-w-28 flex-1 rounded-xl px-3 py-2 text-sm transition ${ativo ? "bg-marca-900 text-white" : "bg-white ring-1 ring-stone-200 hover:ring-marca-400"} ${d === diaISO() && !ativo ? "ring-2 ring-gema-400" : ""}`}
+              className={`min-w-0 flex-1 rounded-xl px-1 py-2 text-center text-sm transition lg:min-w-28 lg:px-3 lg:text-left ${ativo ? "bg-marca-900 text-white" : "bg-white ring-1 ring-stone-200 hover:ring-marca-400"} ${d === diaISO() && !ativo ? "ring-2 ring-gema-400" : ""}`}
             >
-              <span className="block font-semibold first-letter:uppercase">{curto(d)}</span>
-              <span className={`block text-xs ${ativo ? "text-marca-100" : "text-stone-500"}`}>
+              <span className="block text-xs first-letter:uppercase lg:hidden">{curto(d).slice(0, 3)}</span>
+              <span className="block text-lg leading-tight font-bold lg:hidden">{d.slice(8, 10)}</span>
+              <span className={`tabular mx-auto mt-0.5 block h-5 w-fit min-w-5 rounded-full px-1 text-[13px] leading-5 font-semibold lg:hidden ${p.length ? (ativo ? "bg-ouro text-terra" : "bg-ouro/40 text-terra") : "text-transparent"}`}>{p.length || "·"}</span>
+              <span className="hidden font-semibold first-letter:uppercase lg:block">{curto(d)}</span>
+              <span className={`hidden text-xs lg:block ${ativo ? "text-marca-100" : "text-stone-500"}`}>
                 {p.length ? `${p.length} entregas · ${cx(p.reduce((s, x) => s + x.caixas, 0))}` : "sem entregas"}
               </span>
-              <span className={`block text-xs ${ativo ? "text-gema-300" : "text-marca-700"}`}>{r ? km(custoDaRota(r).km) : p.length ? "sem rota" : ""}</span>
+              <span className={`hidden text-xs lg:block ${ativo ? "text-gema-300" : "text-marca-700"}`}>{r ? km(custoDaRota(r).km) : p.length ? "sem rota" : ""}</span>
             </Link>
           );
         })}
-        <Link href={`/painel/rotas?dia=${somarDias(segunda, 7)}`} className="botao-secundario shrink-0 px-2" aria-label="Próxima semana">
+        <Link href={`/painel/rotas?dia=${somarDias(segunda, 7)}`} className="botao-secundario shrink-0 px-2 max-lg:min-w-9! max-lg:px-0!" aria-label="Próxima semana">
           <ChevronRight className="size-4" />
         </Link>
       </nav>
@@ -156,11 +160,12 @@ export default async function Rotas({ searchParams }: PageProps<"/painel/rotas">
                   </p>
                   <p className="mt-1 flex flex-wrap gap-1.5 text-xs">
                     {p.pedidos.map((id, k) => (
-                      <Link key={id} href={`/painel/pedidos/${id}`} className="hover:underline">
+                      <Link key={id} href={`/painel/pedidos/${id}`} className="toque hover:underline">
                         <Etiqueta status={p.status[k]}>#{id} · {STATUS_PEDIDO[p.status[k] as StatusPedido]}</Etiqueta>
                       </Link>
                     ))}
                   </p>
+                  <AcoesContato cliente={p} className="mt-2.5" />
                 </div>
               </li>
             ))}

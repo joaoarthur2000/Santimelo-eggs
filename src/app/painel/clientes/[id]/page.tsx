@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, MapPin, TriangleAlert } from "lucide-react";
 import { FormEmAberto, FormValoresCaixa } from "../rapido/form";
+import { BotaoConfirma } from "@/components/botao-enviar";
+import { AcoesContato } from "@/components/contato";
+import { Recolhe } from "@/components/recolhe";
 import { Cabecalho, Etiqueta } from "@/components/ui";
 import { ASSINATURA_EGGS, condicaoPagamento, STATUS_PEDIDO, type StatusPedido } from "@/lib/constantes";
 import { diaISO, fimDoDia, formatarDataCurta, inicioDoDia, somarDias } from "@/lib/datas";
@@ -48,7 +51,7 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
 
   return (
     <>
-      <Link href="/painel/clientes" className="mb-3 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-marca-700">
+      <Link href="/painel/clientes" className="mb-3 hidden items-center gap-1 text-sm text-stone-500 hover:text-marca-700 lg:inline-flex">
         <ArrowLeft className="size-4" /> Clientes EGGS
       </Link>
       <Cabecalho
@@ -60,7 +63,7 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
         }
       >
         {cliente.linkMaps && (
-          <a href={cliente.linkMaps} target="_blank" rel="noopener noreferrer" className="botao-secundario">
+          <a href={cliente.linkMaps} target="_blank" rel="noopener noreferrer" className="botao-secundario max-lg:hidden">
             <MapPin className="size-4" /> Abrir no Maps
           </a>
         )}
@@ -70,11 +73,13 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
           </form>
         )}
         {cliente.usuario && (
-          <form action={alternarAcesso.bind(null, cliente.id)}>
+          <form action={alternarAcesso.bind(null, cliente.id)} className="max-lg:hidden">
             <button className="botao-secundario">{cliente.usuario.ativo ? "Bloquear acesso" : "Liberar acesso"}</button>
           </form>
         )}
       </Cabecalho>
+
+      <AcoesContato cliente={cliente} className="mb-4" />
 
       {vencido > 0 && (
         <section className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 p-5" role="alert">
@@ -88,7 +93,7 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
         </section>
       )}
 
-      <section className="mb-6 grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+      <section className="mb-6 grid gap-4 max-lg:hidden lg:grid-cols-2 lg:gap-6 [&>*]:min-w-0">
         <div className="cartao p-5">
           <h2 className="mb-3 font-semibold text-marca-950">Valores da caixa</h2>
           <FormValoresCaixa clienteId={cliente.id} venda={cliente.valorVenda} custo={cliente.valorCusto} />
@@ -101,7 +106,7 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
         </div>
       </section>
 
-      <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5 [&>*]:min-w-0">
+      <section className="mb-4 grid grid-cols-2 gap-3 lg:mb-6 lg:grid-cols-5 [&>*]:min-w-0 max-lg:[&>*:last-child]:col-span-2">
         {[
           ["Comprou em 30 dias", reais(faturado30), `${num(vendas.length)} pedidos`],
           ["Caixas em 30 dias", `${num(Math.round(caixas30 * 10) / 10)} cx`, `${num(Math.round((caixas30 / 30) * 7 * 10) / 10)} cx por semana`],
@@ -117,9 +122,21 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
         ))}
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-2 [&>*]:min-w-0">
-        <section className="cartao p-5">
-          <h2 className="mb-3 font-semibold text-marca-950">Dados do cliente</h2>
+      {/* Celular: cobranças e pedidos primeiro, o cadastro fica recolhido */}
+      <div className="grid gap-4 lg:gap-6 xl:grid-cols-2 [&>*]:min-w-0">
+        <section className="cartao px-5 py-2 lg:hidden">
+          <Recolhe rotulo="Valores da caixa">
+            <FormValoresCaixa clienteId={cliente.id} venda={cliente.valorVenda} custo={cliente.valorCusto} />
+          </Recolhe>
+        </section>
+        <section className="cartao px-5 py-2 lg:hidden">
+          <Recolhe rotulo="Lançar valor em aberto">
+            <FormEmAberto clienteId={cliente.id} hoje={hoje} />
+          </Recolhe>
+        </section>
+        <section className="cartao p-5 max-lg:px-5 max-lg:py-2">
+          <Recolhe rotulo="Dados do cliente">
+          <h2 className="mb-3 font-semibold text-marca-950 max-lg:hidden">Dados do cliente</h2>
           <FormDados
             clienteId={cliente.id}
             inicial={{
@@ -128,10 +145,12 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
               limiteCredito: cliente.limiteCredito, observacoes: cliente.observacoes,
             }}
           />
+          </Recolhe>
         </section>
 
-        <section className="cartao p-5">
-          <h2 className="mb-3 font-semibold text-marca-950">Pagamento, nota e negociação</h2>
+        <section className="cartao p-5 max-lg:px-5 max-lg:py-2">
+          <Recolhe rotulo="Pagamento, nota e app">
+          <h2 className="mb-3 font-semibold text-marca-950 max-lg:hidden">Pagamento, nota e negociação</h2>
           <FormCondicoes
             clienteId={cliente.id}
             regioes={regioes.map((r) => ({ id: r.id, nome: r.nome }))}
@@ -159,11 +178,18 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
                 <BotaoLiberarApp clienteId={cliente.id} linkApp={linkDoApp()} />
               </>
             )}
+            {cliente.usuario && (
+              <form action={alternarAcesso.bind(null, cliente.id)} className="mt-3 lg:hidden">
+                <button className="botao-secundario w-full">{cliente.usuario.ativo ? "Bloquear acesso ao app" : "Liberar acesso ao app"}</button>
+              </form>
+            )}
           </div>
+          </Recolhe>
         </section>
 
-        <section className="cartao p-5">
-          <h2 className="font-semibold text-marca-950">Preço combinado</h2>
+        <section className="cartao p-5 max-lg:px-5 max-lg:py-2">
+          <Recolhe rotulo="Preço combinado">
+          <h2 className="font-semibold text-marca-950 max-lg:hidden">Preço combinado</h2>
           <p className="mb-3 text-xs text-stone-500">Vazio = preço de tabela. O cliente vê &quot;seu preço&quot; no app, e preço agendado não muda o dele.</p>
           <ul className="divide-y divide-stone-100 text-sm">
             {produtos.map((p) => (
@@ -174,16 +200,18 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
                 </span>
                 <form action={salvarPrecoEspecial.bind(null, cliente.id, p.id)} className="flex items-center gap-1">
                   <span className="text-stone-500">R$</span>
-                  <input name="preco" inputMode="decimal" defaultValue={especial.has(p.id) ? especial.get(p.id)!.toFixed(2).replace(".", ",") : ""} placeholder="tabela" className="campo w-24 py-1" />
+                  <input name="preco" inputMode="decimal" defaultValue={especial.has(p.id) ? especial.get(p.id)!.toFixed(2).replace(".", ",") : ""} placeholder="tabela" aria-label={`Preço combinado de ${nomeProduto(p)}`} className="campo w-24 py-1" />
                   <button className="botao-secundario px-2 py-1 text-xs">Salvar</button>
                 </form>
               </li>
             ))}
           </ul>
+          </Recolhe>
         </section>
 
-        <section className="cartao p-5">
-          <h2 className="mb-3 font-semibold text-marca-950">Mandar mensagem no app</h2>
+        <section className="cartao p-5 max-lg:px-5 max-lg:py-2">
+          <Recolhe rotulo="Mandar mensagem no app">
+          <h2 className="mb-3 font-semibold text-marca-950 max-lg:hidden">Mandar mensagem no app</h2>
           <FormMensagem clienteId={cliente.id} assinatura={ASSINATURA_EGGS} />
           <ul className="mt-4 space-y-2 text-sm">
             {cliente.mensagens.map((m) => (
@@ -195,9 +223,10 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
               </li>
             ))}
           </ul>
+          </Recolhe>
         </section>
 
-        <section className="cartao p-5">
+        <section className="cartao p-5 max-lg:order-first">
           <h2 className="mb-3 font-semibold text-marca-950">Cobranças</h2>
           <ul className="divide-y divide-stone-100 text-sm">
             {cliente.cobrancas.map((c) => (
@@ -212,7 +241,7 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
                     <span className="text-xs text-marca-700">pago {formatarDataCurta(c.pagoEm)}</span>
                   ) : (
                     <form action={marcarPago.bind(null, c.id)}>
-                      <button className="botao-secundario px-2 py-1 text-xs">Marcar pago</button>
+                      <BotaoConfirma className="botao-secundario px-2 py-1 text-xs" confirmar="Confirmar">Marcar pago</BotaoConfirma>
                     </form>
                   )}
                 </span>
@@ -224,7 +253,7 @@ export default async function ClienteEggs({ params }: PageProps<"/painel/cliente
           <ul className="divide-y divide-stone-100 text-sm">
             {cliente.pedidos.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-3 py-2">
-                <Link href={`/painel/pedidos/${p.id}`} className="hover:underline">
+                <Link href={`/painel/pedidos/${p.id}`} className="toque hover:underline">
                   #{p.id} · {formatarDataCurta(p.dataEntrega)}
                   {p.janela && ` · ${p.janela.inicio}–${p.janela.fim}`}
                 </Link>

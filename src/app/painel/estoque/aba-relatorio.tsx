@@ -1,5 +1,5 @@
+import { GraficoBarras } from "@/components/graficos";
 import Link from "next/link";
-import { GraficoBarras } from "@/components/grafico-barras";
 import { Codigo, Indicador, Vazio } from "@/components/ui";
 import { diaISO, fimDoDia, inicioDoDia, somarDias } from "@/lib/datas";
 import { db } from "@/lib/db";
@@ -100,7 +100,7 @@ export async function AbaRelatorio({ sp }: { sp: Record<string, string | string[
           <Link
             key={k}
             href={`/painel/estoque?aba=relatorio&periodo=${k}`}
-            className={`rounded-full px-3.5 py-1.5 text-sm whitespace-nowrap ring-1 ring-inset transition-colors duration-150 ${
+            className={`rounded-full px-3.5 py-1.5 text-sm whitespace-nowrap ring-1 max-lg:py-3 ring-inset transition-colors duration-150 ${
               periodo === k ? "bg-marca-900 font-medium text-white ring-marca-900" : "bg-white text-stone-600 ring-stone-200 hover:text-marca-950 hover:ring-stone-300"
             }`}
           >
@@ -128,7 +128,7 @@ export async function AbaRelatorio({ sp }: { sp: Record<string, string | string[
 
       <section className="cartao mt-6 overflow-x-auto">
         <h2 className="px-5 pt-5 font-semibold text-marca-950">Por tipo de ovo</h2>
-        <table className="mt-3 w-full text-sm">
+        <table className="lista-cel mt-3 w-full text-sm">
           <thead className="border-y border-stone-200 text-left text-[11px] text-stone-500 uppercase">
             <tr>
               <th className="px-4 py-3">Produto</th>
@@ -144,18 +144,18 @@ export async function AbaRelatorio({ sp }: { sp: Record<string, string | string[
           <tbody className="divide-y divide-stone-100">
             {porItem.map((l) => (
               <tr key={l.item.id}>
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td data-c="t" className="px-4 py-3 whitespace-nowrap">
                   <span className="flex items-center gap-2">
                     <Codigo codigo={l.item.codigo} /> {l.item.nome}
                   </span>
                 </td>
-                <td className={`${td} text-stone-500`}>{qtd(l.inicio, l.item.unidadeEstoque)}</td>
-                <td className={`${td} text-emerald-700`}>{l.compras ? `+${num(redondo(l.compras))}` : "—"}</td>
-                <td className={td}>{l.vendas ? `−${num(redondo(l.vendas))}` : "—"}</td>
-                <td className={`${td} text-red-700`}>{l.perdas ? `−${num(redondo(l.perdas))}` : "—"}</td>
-                <td className={`${td} text-stone-500`}>{Math.abs(l.ajustes) > 0.001 ? `${l.ajustes > 0 ? "+" : "−"}${num(redondo(Math.abs(l.ajustes)))}` : "—"}</td>
-                <td className={`${td} font-semibold ${l.fim < -0.001 ? "text-red-700" : "text-marca-950"}`}>{qtd(l.fim, l.item.unidadeEstoque)}</td>
-                <td className={td}>{l.comprado ? reais(l.comprado) : "—"}</td>
+                <td data-c="p" data-r="Início" className={`${td} text-stone-500`}>{qtd(l.inicio, l.item.unidadeEstoque)}</td>
+                <td data-c="p" data-r="Compras" className={`${td} text-emerald-700`}>{l.compras ? `+${num(redondo(l.compras))}` : "—"}</td>
+                <td data-c="p" data-r="Vendas" className={td}>{l.vendas ? `−${num(redondo(l.vendas))}` : "—"}</td>
+                <td data-c="p" data-r="Perdas" className={`${td} text-red-700`}>{l.perdas ? `−${num(redondo(l.perdas))}` : "—"}</td>
+                <td data-c="p" data-r="Ajustes" className={`${td} text-stone-500`}>{Math.abs(l.ajustes) > 0.001 ? `${l.ajustes > 0 ? "+" : "−"}${num(redondo(Math.abs(l.ajustes)))}` : "—"}</td>
+                <td data-c="v" className={`${td} font-semibold ${l.fim < -0.001 ? "text-red-700" : "text-marca-950"}`}>{qtd(l.fim, l.item.unidadeEstoque)}</td>
+                <td data-c="p" data-r="Comprado" className={td}>{l.comprado ? reais(l.comprado) : "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -169,7 +169,7 @@ export async function AbaRelatorio({ sp }: { sp: Record<string, string | string[
             <Vazio>Nenhum fornecedor cadastrado.</Vazio>
           </div>
         ) : (
-          <table className="mt-3 w-full text-sm">
+          <table className="lista-cel mt-3 w-full text-sm">
             <thead className="border-y border-stone-200 text-left text-[11px] text-stone-500 uppercase">
               <tr>
                 <th className="px-4 py-3">Fornecedor</th>
@@ -184,12 +184,12 @@ export async function AbaRelatorio({ sp }: { sp: Record<string, string | string[
             <tbody className="divide-y divide-stone-100">
               {linhasFornecedor.map((l) => (
                 <tr key={l.f.id}>
-                  <td className="px-4 py-3 font-medium whitespace-nowrap text-marca-950">
+                  <td data-c="t" className="px-4 py-3 font-medium whitespace-nowrap text-marca-950">
                     <Link href="/painel/fornecedores" className="hover:underline">{l.f.nome}</Link>
                   </td>
-                  <td className={td}>{l.caixas ? `${num(redondo(l.caixas))} cx` : "—"}</td>
-                  <td className={td}>{l.valor ? reais(l.valor) : "—"}</td>
-                  <td className={td}>
+                  <td data-c="p" data-r="Comprou" className={td}>{l.caixas ? `${num(redondo(l.caixas))} cx` : "—"}</td>
+                  <td data-c="p" data-r="Valor" className={td}>{l.valor ? reais(l.valor) : "—"}</td>
+                  <td data-c="p" data-r="Custo médio" className={td}>
                     {l.custo !== null ? (
                       <span className="inline-flex items-center gap-1.5">
                         {l.custo === melhorCusto && linhasFornecedor.filter((x) => x.custo !== null).length > 1 && (
@@ -201,9 +201,9 @@ export async function AbaRelatorio({ sp }: { sp: Record<string, string | string[
                       "—"
                     )}
                   </td>
-                  <td className={td}>{l.vendidas ? `${num(redondo(l.vendidas))} cx` : "—"}</td>
-                  <td className={`${td} text-red-700`}>{l.perdas ? `${num(redondo(l.perdas))} cx` : "—"}</td>
-                  <td className={`${td} font-semibold`}>{`${num(redondo(l.estoque))} cx`}</td>
+                  <td data-c="p" data-r="Vendido" className={td}>{l.vendidas ? `${num(redondo(l.vendidas))} cx` : "—"}</td>
+                  <td data-c="p" data-r="Perdas" className={`${td} text-red-700`}>{l.perdas ? `${num(redondo(l.perdas))} cx` : "—"}</td>
+                  <td data-c="v" className={`${td} font-semibold`}>{`${num(redondo(l.estoque))} cx`}</td>
                 </tr>
               ))}
             </tbody>

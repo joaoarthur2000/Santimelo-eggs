@@ -36,7 +36,7 @@ export default async function Atendimentos({ searchParams }: PageProps<"/painel/
 
   return (
     <>
-      <Cabecalho titulo="Atendimentos" subtitulo="O que os clientes pediram no chat do Guinho, já com o assunto. Mais antigo primeiro.">
+      <Cabecalho titulo="Atendimentos" explica subtitulo="O que os clientes pediram no chat do Guinho, já com o assunto. Mais antigo primeiro.">
         <AtualizaSozinho segundos={20} />
       </Cabecalho>
 

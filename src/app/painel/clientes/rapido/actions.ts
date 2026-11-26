@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { PAGAMENTOS_RAPIDO } from "@/lib/constantes";
 import { db } from "@/lib/db";
+import { errosDoForm } from "@/lib/erros";
 import { buscarNegocio, type DadosNegocio } from "@/lib/google-negocio";
 import { exigirPapel } from "@/lib/sessao";
 
-export type EstadoCadastro = { erro?: string; ok?: number; id?: string; nome?: string };
+export type EstadoCadastro = { erro?: string; ok?: number; id?: string; nome?: string; campos?: Record<string, string> };
 
 const texto = (v: FormDataEntryValue | null) => String(v ?? "").trim() || null;
 // "185", "185,50" e "185.50" valem; vazio = não informado
@@ -23,8 +24,8 @@ const TIPO_A_DEFINIR = "A definir";
 const esquema = z.object({
   nomeFantasia: z.string().min(2, "Informe o nome do cliente").max(80),
   pagamento: z.enum(PAGAMENTOS_RAPIDO, "Escolha a forma de pagamento"),
-  endereco: z.string().max(200).nullable(),
-  whatsapp: z.string().regex(/^[\d\s()+-]{8,20}$/, "Telefone inválido").nullable(),
+  endereco: z.string().nullable(),
+  whatsapp: z.string().nullable(), // entra como foi digitado: telefone incompleto não trava o cadastro
 });
 
 export async function cadastrarClienteRapido(_e: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -32,13 +33,13 @@ export async function cadastrarClienteRapido(_e: EstadoCadastro, form: FormData)
   const r = esquema.safeParse({
     nomeFantasia: texto(form.get("nomeFantasia")) ?? "",
     pagamento: texto(form.get("pagamento")),
-    endereco: texto(form.get("endereco")),
-    whatsapp: texto(form.get("whatsapp")),
+    endereco: texto(form.get("endereco"))?.slice(0, 200) ?? null,
+    whatsapp: texto(form.get("whatsapp"))?.slice(0, 20) ?? null,
   });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   const { nomeFantasia, pagamento, endereco, whatsapp } = r.data;
 
-  if (await db.cliente.findFirst({ where: { nomeFantasia } })) return { erro: `Já existe um cliente chamado ${nomeFantasia}` };
+  if (await db.cliente.findFirst({ where: { nomeFantasia } })) return { erro: `Já existe um cliente chamado ${nomeFantasia}`, campos: { nomeFantasia: "Já existe um cliente com esse nome" } };
 
   const nf = pagamento === "NF";
   const cliente = await db.cliente.create({
@@ -81,7 +82,7 @@ export async function salvarValoresCaixa(clienteId: string, _e: EstadoCadastro, 
   const r = z
     .object({ valorVenda: z.number().positive("Valor de venda inválido").max(100000).nullable(), valorCusto: z.number().positive("Valor de custo inválido").max(100000).nullable() })
     .safeParse({ valorVenda: valor(form.get("valorVenda")), valorCusto: valor(form.get("valorCusto")) });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   const caixa = await produtoCaixaBranco();
   await db.$transaction(async (tx) => {
     await tx.cliente.update({ where: { id: clienteId }, data: r.data });
@@ -100,7 +101,7 @@ export async function lancarEmAberto(clienteId: string, _e: EstadoCadastro, form
   const r = z
     .object({ valor: z.number("Informe o valor").positive("Informe o valor").max(1000000), vencimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe o vencimento"), descricao: z.string().max(120).nullable() })
     .safeParse({ valor: valor(form.get("valor")), vencimento: texto(form.get("vencimento")) ?? "", descricao: texto(form.get("descricao")) });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   await db.cobranca.create({ data: { clienteId, valor: r.data.valor, vencimento: r.data.vencimento, descricao: r.data.descricao ?? `Lançado por ${usuario.nome}` } });
   revalidatePath("/painel", "layout");
   return { ok: Date.now() };

@@ -8,6 +8,8 @@ import { STATUS_PEDIDO } from "@/lib/constantes";
 import { diaISO, inicioDoDia } from "@/lib/datas";
 import { sincronizarCobranca } from "@/lib/eggs";
 import { sincronizarBaixaDoPedido } from "@/lib/estoque";
+import { reais } from "@/lib/formato";
+import { esquemaPagamento, validarPagamento, type PagamentoEscolhido } from "@/lib/pagamento";
 import { exigirPapel } from "@/lib/sessao";
 
 /** Mensagem no app do cliente a cada etapa: o app avisa com imagem, som e vibração (ver eggs/(app)/avisador.tsx) */
@@ -81,11 +83,34 @@ export async function excluirPedido(id: number, voltarProDia = false, mesmoPago 
   return {};
 }
 
+/** Troca a forma ou o prazo de um pedido ainda não pago (a cobrança acompanha) */
+export async function definirPagamento(id: number, dados: PagamentoEscolhido): Promise<{ erro?: string }> {
+  await exigirPapel("DIRETOR");
+  const r = esquemaPagamento.safeParse(dados);
+  if (!r.success) return { erro: r.error.issues[0].message };
+  const pedido = await db.pedido.findUnique({ where: { id }, include: { cobranca: true } });
+  if (!pedido) return { erro: "Esse pedido não existe mais." };
+  if (pedido.cobranca?.pagoEm) return { erro: "Esse pedido já foi pago. Desfaça o pagamento pra mudar." };
+  const pagamento = validarPagamento(r.data, diaISO(pedido.dataEntrega));
+  if ("erro" in pagamento) return pagamento;
+  await db.pedido.update({ where: { id }, data: pagamento.dados });
+  await sincronizarCobranca(id);
+  revalidatePath("/painel", "layout");
+  revalidatePath("/eggs", "layout");
+  return {};
+}
+
 const esquemaPedido = z.object({
   clienteId: z.string().min(1, "Escolha o cliente"),
   dia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   origem: z.enum(["WHATSAPP", "PAINEL"]),
   observacao: z.string().max(500).optional(),
+  pagamento: esquemaPagamento,
+  /** lançamento de um dia que já passou: a entrega já aconteceu */
+  entregue: z.boolean().optional(),
+  /** ... e o dinheiro já entrou */
+  recebido: z.boolean().optional(),
+  voltarProDia: z.boolean().optional(),
   itens: z
     .array(
       z.object({
@@ -101,23 +126,20 @@ const esquemaPedido = z.object({
 
 export type NovoPedido = z.infer<typeof esquemaPedido>;
 
-export async function criarPedido(dados: NovoPedido): Promise<{ erro?: string }> {
-  await exigirPapel("DIRETOR");
-  const r = esquemaPedido.safeParse(dados);
-  if (!r.success) return { erro: r.error.issues[0].message };
-
-  // Valor: o digitado no pedido (só o painel lança por aqui); sem ele, o combinado com o cliente ou o de tabela
-  const ids = r.data.itens.map((i) => i.produtoId);
-  const idsFornecedor = [...new Set(r.data.itens.map((i) => i.fornecedorId).filter((f): f is string => !!f))];
+/** Itens com o valor certo: o digitado (só o painel lança por aqui); sem ele, o combinado com o cliente ou o de tabela */
+async function montarItens(dados: NovoPedido, jaNoPedido: string[] = []) {
+  const ids = dados.itens.map((i) => i.produtoId);
+  const idsFornecedor = [...new Set(dados.itens.map((i) => i.fornecedorId).filter((f): f is string => !!f))];
   const [produtos, cliente, especiais, fornecedores] = await Promise.all([
-    db.produto.findMany({ where: { id: { in: ids }, ativo: true } }),
-    db.cliente.findUnique({ where: { id: r.data.clienteId }, select: { notaFiscal: true } }),
-    db.precoCliente.findMany({ where: { clienteId: r.data.clienteId, produtoId: { in: ids } } }),
+    db.produto.findMany({ where: { id: { in: ids }, OR: [{ ativo: true }, { id: { in: jaNoPedido } }] } }),
+    db.cliente.findUnique({ where: { id: dados.clienteId }, select: { notaFiscal: true } }),
+    db.precoCliente.findMany({ where: { clienteId: dados.clienteId, produtoId: { in: ids } } }),
     db.fornecedor.findMany({ where: { id: { in: idsFornecedor } }, select: { id: true } }),
   ]);
+  if (!cliente) return { erro: "Cliente não encontrado" };
   if (fornecedores.length !== idsFornecedor.length) return { erro: "Fornecedor não encontrado" };
   const preco = new Map(produtos.map((p) => [p.id, especiais.find((e) => e.produtoId === p.id)?.preco ?? p.preco]));
-  const itens = r.data.itens
+  const itens = dados.itens
     .filter((i) => preco.has(i.produtoId))
     .map((i) => {
       const precoUnit = Math.round((i.precoUnit ?? preco.get(i.produtoId)!) * 100) / 100;
@@ -130,21 +152,92 @@ export async function criarPedido(dados: NovoPedido): Promise<{ erro?: string }>
       };
     });
   if (itens.length === 0) return { erro: "Nenhum produto válido no pedido" };
+  return { itens, total: Math.round(itens.reduce((s, i) => s + i.subtotal, 0) * 100) / 100, notaFiscal: cliente.notaFiscal };
+}
+
+const horaDaEntrega = (dia: string) => new Date(inicioDoDia(dia).getTime() + 8 * 3600 * 1000);
+
+export async function criarPedido(dados: NovoPedido): Promise<{ erro?: string }> {
+  const usuario = await exigirPapel("DIRETOR");
+  const r = esquemaPedido.safeParse(dados);
+  if (!r.success) return { erro: r.error.issues[0].message };
+  const { dia } = r.data;
+  const pagamento = validarPagamento(r.data.pagamento, dia);
+  if ("erro" in pagamento) return pagamento;
+  const montado = await montarItens(r.data);
+  if ("erro" in montado) return montado;
+  const passado = dia <= diaISO(); // só o que já chegou no dia pode nascer entregue ou recebido
+  const entregue = passado && !!r.data.entregue;
 
   const pedido = await db.pedido.create({
     data: {
       clienteId: r.data.clienteId,
       origem: r.data.origem,
-      notaFiscal: cliente?.notaFiscal ?? false,
+      status: entregue ? "ENTREGUE" : "NOVO",
+      notaFiscal: montado.notaFiscal,
       observacao: r.data.observacao || null,
-      dataEntrega: new Date(inicioDoDia(r.data.dia).getTime() + 8 * 3600 * 1000),
-      total: Math.round(itens.reduce((s, i) => s + i.subtotal, 0) * 100) / 100,
-      itens: { create: itens },
+      ...pagamento.dados,
+      dataEntrega: horaDaEntrega(dia),
+      total: montado.total,
+      itens: { create: montado.itens },
     },
   });
 
+  if (entregue) await sincronizarBaixaDoPedido(pedido.id, usuario.nome);
   await sincronizarCobranca(pedido.id);
-  revalidatePath("/painel");
-  revalidatePath("/painel/pedidos");
-  redirect(`/painel/pedidos/${pedido.id}`);
+  if (passado && r.data.recebido) {
+    // à vista, o dinheiro entrou no dia da entrega; a prazo já pago, entrou agora
+    const agora = new Date();
+    const naEntrega = new Date(inicioDoDia(dia).getTime() + 12 * 3600 * 1000);
+    await db.cobranca.update({ where: { pedidoId: pedido.id }, data: { pagoEm: pagamento.dados.condicaoPagamento === "VISTA" && naEntrega < agora ? naEntrega : agora } });
+  }
+  revalidatePath("/painel", "layout");
+  revalidatePath("/eggs", "layout");
+  redirect(r.data.voltarProDia ? `/painel/dia?dia=${dia}` : `/painel/pedidos/${pedido.id}`);
+}
+
+/**
+ * Corrige um pedido já lançado: cliente, dia, itens, valores, fornecedor, pagamento e se foi entregue.
+ * Estoque e cobrança acompanham. Pago: valor e cliente só mudam depois de desfazer o pagamento.
+ */
+export async function editarPedido(id: number, dados: NovoPedido): Promise<{ erro?: string }> {
+  const usuario = await exigirPapel("DIRETOR");
+  const r = esquemaPedido.safeParse(dados);
+  if (!r.success) return { erro: r.error.issues[0].message };
+  const { dia, clienteId } = r.data;
+  const pagamento = validarPagamento(r.data.pagamento, dia);
+  if ("erro" in pagamento) return pagamento;
+  const pedido = await db.pedido.findUnique({ where: { id }, include: { itens: true, cobranca: true } });
+  if (!pedido) return { erro: "Esse pedido não existe mais." };
+  if (pedido.status === "CANCELADO") return { erro: "Pedido cancelado: reabra antes de editar." };
+  const montado = await montarItens(r.data, pedido.itens.map((i) => i.produtoId));
+  if ("erro" in montado) return montado;
+  if (pedido.cobranca?.pagoEm && (Math.abs(montado.total - pedido.cobranca.valor) > 0.005 || clienteId !== pedido.clienteId)) {
+    return { erro: `Esse pedido já foi pago (${reais(pedido.cobranca.valor)}). Pra mudar valor ou cliente, desfaça o pagamento na tela do pedido.` };
+  }
+
+  const mudouDia = diaISO(pedido.dataEntrega) !== dia;
+  const status = r.data.entregue ? "ENTREGUE" : pedido.status === "ENTREGUE" ? "NOVO" : pedido.status;
+  await db.$transaction([
+    db.pedidoItem.deleteMany({ where: { pedidoId: id } }),
+    db.pedido.update({
+      where: { id },
+      data: {
+        clienteId,
+        status,
+        observacao: r.data.observacao || null,
+        ...pagamento.dados,
+        total: montado.total,
+        itens: { create: montado.itens },
+        ...(pedido.origem !== "APP" && { origem: r.data.origem }), // pedido feito no app continua sendo do app
+        ...(mudouDia && { dataEntrega: horaDaEntrega(dia), janelaId: null }),
+        ...(clienteId !== pedido.clienteId && { notaFiscal: montado.notaFiscal }),
+      },
+    }),
+  ]);
+  await sincronizarBaixaDoPedido(id, usuario.nome);
+  await sincronizarCobranca(id);
+  revalidatePath("/painel", "layout");
+  revalidatePath("/eggs", "layout");
+  redirect(r.data.voltarProDia ? `/painel/dia?dia=${dia}` : `/painel/pedidos/${id}`);
 }

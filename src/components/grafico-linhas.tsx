@@ -1,5 +1,6 @@
 "use client";
 
+import { useEstreito } from "./use-estreito";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Serie } from "./grafico-barras";
 
@@ -8,6 +9,7 @@ const reais = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curr
 /** Linhas em degrau (preço vale até mudar), com legenda e tooltip. Valores em R$ */
 export function GraficoLinhas({ dados, categoria, series, altura = 240 }: { dados: Record<string, string | number | null>[]; categoria: string; series: Serie[]; altura?: number }) {
   const eixoTexto = { fontSize: 12, fill: "#57534e" };
+  const estreito = useEstreito();
   return (
     <div>
       <ul className="mb-3 flex flex-wrap gap-4 text-xs text-stone-600">
@@ -19,10 +21,10 @@ export function GraficoLinhas({ dados, categoria, series, altura = 240 }: { dado
         ))}
       </ul>
       <ResponsiveContainer width="100%" height={altura}>
-        <LineChart data={dados} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+        <LineChart data={dados} margin={{ top: 8, right: estreito ? 4 : 12, bottom: 0, left: 0 }}>
           <CartesianGrid stroke="#e7e5e4" vertical={false} />
           <XAxis dataKey={categoria} tick={eixoTexto} axisLine={false} tickLine={false} minTickGap={16} />
-          <YAxis tickFormatter={reais} tick={eixoTexto} axisLine={false} tickLine={false} width={72} domain={[0, "auto"]} />
+          <YAxis tickFormatter={reais} tick={eixoTexto} axisLine={false} tickLine={false} width={estreito ? 52 : 72} domain={[0, "auto"]} />
           <Tooltip
             formatter={(valor, nome) => [reais(Number(valor)), series.find((s) => s.chave === nome)?.rotulo ?? nome]}
             contentStyle={{ borderRadius: 8, border: "1px solid #e7e5e4", fontSize: 12 }}

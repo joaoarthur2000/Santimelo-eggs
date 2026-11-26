@@ -202,6 +202,9 @@ model Pedido {
   criadoEm    DateTime           @default(now())
   janelaId    String? // horÃ¡rio de entrega escolhido no app
   janela      JanelaEntrega?     @relation(fields: [janelaId], references: [id])
+  formaPagamento    String? // como o cliente vai pagar ESSE pedido: Dinheiro | Pix (nulo = o combinado no cadastro)
+  condicaoPagamento String? // VISTA | PRAZO (nulo = o combinado no cadastro)
+  vencimento        String? // "AAAA-MM-DD", so a prazo: dia combinado pra pagar
   itens       PedidoItem[]
   movimentos  MovimentoEstoque[]
   cobranca    Cobranca?

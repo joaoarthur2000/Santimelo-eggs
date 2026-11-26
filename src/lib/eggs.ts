@@ -3,6 +3,7 @@ import { ASSINATURA_EGGS, AVISO_PAGAMENTO_DIAS, DIAS_SEMANA } from "./constantes
 import { diaDaSemana, diaISO, fimDoDia, formatarDia, inicioDoDia, somarDias } from "./datas";
 import { db } from "./db";
 import { quantidade, reais } from "./formato";
+import { pagamentoDoPedido, vencimentoDoPedido } from "./pagamento";
 import { enviarProGrupo } from "./whatsapp";
 
 // Regras do app EGGS (clientes de ovos). O app e o painel usam o mesmo banco: pedido feito no app
@@ -81,8 +82,8 @@ export async function agendaDaRegiao(regiaoId: string | null, dias = 14) {
 }
 
 /**
- * Deixa a cobrança do pedido de acordo com ele: vence N dias depois da entrega
- * (prazo combinado; sem prazo = no dia da entrega). Pedido cancelado apaga a cobrança em aberto.
+ * Deixa a cobrança do pedido de acordo com ele: vence no dia escolhido no lançamento (à vista = dia da entrega;
+ * a prazo = a data). Pedido sem escolha (app ou antigo) vence N dias depois da entrega, pelo prazo do cliente. Pedido cancelado apaga a cobrança em aberto.
  * Cobrança já paga nunca é mexida.
  */
 export async function sincronizarCobranca(pedidoId: number) {
@@ -92,8 +93,8 @@ export async function sincronizarCobranca(pedidoId: number) {
     if (pedido.cobranca) await db.cobranca.delete({ where: { id: pedido.cobranca.id } });
     return;
   }
-  const dados = { valor: pedido.total, vencimento: somarDias(diaISO(pedido.dataEntrega), pedido.cliente.prazoPagamentoDias ?? 0) };
-  await db.cobranca.upsert({ where: { pedidoId }, update: dados, create: { ...dados, pedidoId, clienteId: pedido.clienteId } });
+  const dados = { valor: pedido.total, vencimento: vencimentoDoPedido(pedido, pedido.cliente, diaISO(pedido.dataEntrega)) };
+  await db.cobranca.upsert({ where: { pedidoId }, update: { ...dados, clienteId: pedido.clienteId }, create: { ...dados, pedidoId, clienteId: pedido.clienteId } });
 }
 
 /** Primeiro nome de quem cuida da conta (ou o nome do estabelecimento) */
@@ -148,7 +149,7 @@ export async function textoPedidoGrupo(pedidoId: number) {
     "",
     `*Total:* ${reais(p.total)}`,
     "*Frete:* grátis",
-    `*Pagamento:* ${[c.formaPagamento, p.cobranca && `vence ${formatarDia(p.cobranca.vencimento, { day: "2-digit", month: "2-digit" })}`].filter(Boolean).join(" · ") || "a combinar"}`,
+    `*Pagamento:* ${[pagamentoDoPedido(p, c).forma, p.cobranca && `vence ${formatarDia(p.cobranca.vencimento, { day: "2-digit", month: "2-digit" })}`].filter(Boolean).join(" · ") || "a combinar"}`,
     p.observacao && `*Obs:* ${p.observacao}`,
   ];
   return linhas.filter((l) => typeof l === "string").join("\n");

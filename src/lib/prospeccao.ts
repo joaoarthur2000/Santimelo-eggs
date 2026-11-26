@@ -148,7 +148,7 @@ export const formatarCnpj = (cnpj: string | null | undefined) => {
 
 export const CHAVE_MENSAGEM = "prospeccao.mensagem"; // tabela Configuracao
 export const MENSAGEM_PADRAO = `Oi, tudo bem? Aqui é o João, da Santimelo 🥚
-A gente distribui ovos em Porto Alegre e região e entrega direto no estabelecimento, nas terças e quintas de manhã.
+A gente distribui ovos em Porto Alegre e região e entrega direto no estabelecimento, nas segundas, terças e sextas de manhã.
 Vi a {nome} e queria saber se vocês teriam interesse numa cotação. Se fizer sentido, passo aí e deixo uma amostra pra vocês testarem.
 Se não for o momento, é só avisar que não mando mais mensagem 🙂`;
 

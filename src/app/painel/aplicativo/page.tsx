@@ -7,7 +7,7 @@ import { CONFIG, lerConfig, versaoDoApp } from "@/lib/config";
 import { formatarDataCurta, formatarHora } from "@/lib/datas";
 import { db } from "@/lib/db";
 import { textoPedidoGrupo } from "@/lib/eggs";
-import { linkDoApp } from "@/lib/rede";
+import { linkDoApp, linkDoPainel, linkDoPainelPeloIp } from "@/lib/rede";
 import { ULTIMO_ENVIO, whatsappConectado } from "@/lib/whatsapp";
 import { BotaoCopiar, BotaoTesteWhatsapp, FormAvisoTodos, FormManutencao, FormNovidades, FormWhatsappAtendimento } from "../forms";
 
@@ -18,9 +18,11 @@ const minutosDesde = (d: Date) => (Date.now() - d.getTime()) / 60000;
 
 export default async function AplicativoEggs() {
   const link = linkDoApp();
+  const painel = linkDoPainel();
   const versao = versaoDoApp();
-  const [qr, manutencao, manutencaoTexto, novidades, clientes, ultimoEnvio, ultimoPedido, whatsAtendimento] = await Promise.all([
+  const [qr, qrPainel, manutencao, manutencaoTexto, novidades, clientes, ultimoEnvio, ultimoPedido, whatsAtendimento] = await Promise.all([
     QRCode.toString(link, { type: "svg", margin: 1, color: { dark: "#3d2614", light: "#ffffff" } }),
+    QRCode.toString(painel, { type: "svg", margin: 1, color: { dark: "#402924", light: "#ffffff" } }),
     lerConfig(CONFIG.MANUTENCAO),
     lerConfig(CONFIG.MANUTENCAO_TEXTO),
     lerConfig(CONFIG.NOVIDADES),
@@ -36,7 +38,7 @@ export default async function AplicativoEggs() {
 
   return (
     <>
-      <Cabecalho titulo="Aplicativo EGGS" subtitulo="Como o cliente abre no celular, e o controle do app: avisos, manutenção e quem está usando." />
+      <Cabecalho titulo="Aplicativo EGGS" explica subtitulo="Como o cliente abre no celular, e o controle do app: avisos, manutenção e quem está usando." />
 
       <div className="grid gap-6 xl:grid-cols-[380px_1fr] [&>*]:min-w-0">
         <section className="cartao p-5">
@@ -61,6 +63,22 @@ export default async function AplicativoEggs() {
         </section>
 
         <div className="space-y-6">
+          <section className="cartao p-5">
+            <h2 className="font-semibold text-marca-950">Este painel no seu iPhone</h2>
+            <div className="mt-3 flex flex-wrap items-start gap-5">
+              <div className="w-40 shrink-0" dangerouslySetInnerHTML={{ __html: qrPainel }} />
+              <div className="min-w-56 flex-1 text-sm text-stone-700">
+                <ol className="list-decimal space-y-1 pl-5">
+                  <li>Aponte a câmera pro QR code e abra no <b>Safari</b>.</li>
+                  <li>Toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>.</li>
+                  <li>Abra pelo ícone novo e entre com o seu login. Ele fica salvo por 30 dias.</li>
+                </ol>
+                <p className="mt-2 break-all font-mono text-xs font-semibold">{painel}</p>
+                {local && <p className="mt-2 text-xs text-stone-500">Vale no mesmo Wi-Fi, com o PC ligado e o sistema aberto. Se não abrir, digite {linkDoPainelPeloIp()} no Safari (esse número muda quando o PC troca de rede).</p>}
+              </div>
+            </div>
+          </section>
+
           <section className="cartao p-5">
             <h2 className="font-semibold text-marca-950">Atualizações</h2>
             <p className="mt-1 text-sm text-stone-600">
@@ -127,7 +145,7 @@ export default async function AplicativoEggs() {
 
           <section className="cartao overflow-x-auto">
             <h2 className="px-4 pt-4 font-semibold text-marca-950">Quem está usando</h2>
-            <table className="mt-2 w-full text-sm">
+            <table className="lista-cel mt-2 w-full text-sm">
               <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
                 <tr>
                   <th className="px-4 py-2">Cliente</th>
@@ -143,14 +161,14 @@ export default async function AplicativoEggs() {
                   const online = u?.ultimoAcesso && minutosDesde(u.ultimoAcesso) < 10;
                   return (
                     <tr key={c.id}>
-                      <td className="px-4 py-2">
-                        <Link href={`/painel/clientes/${c.id}`} className="hover:underline">{c.nomeFantasia}</Link>
+                      <td data-c="t" className="px-4 py-2">
+                        <Link href={`/painel/clientes/${c.id}`} className="linha-toque hover:underline">{c.nomeFantasia}</Link>
                       </td>
-                      <td className="px-4 py-2 font-mono">{u?.codigoAcesso ?? "—"}</td>
-                      <td className="px-4 py-2">
+                      <td data-c="x" className="px-4 py-2 font-mono">{u?.codigoAcesso ?? "—"}</td>
+                      <td data-c="s" className="px-4 py-2">
                         {online ? <span className="font-semibold text-marca-700">usando agora</span> : u?.ultimoAcesso ? `${formatarDataCurta(u.ultimoAcesso)} ${formatarHora(u.ultimoAcesso)}` : "nunca entrou"}
                       </td>
-                      <td className="px-4 py-2">{!u ? "sem acesso" : !u.ativo ? "bloqueado" : travado ? <span className="text-red-700">travado (senha errada)</span> : "ativo"}</td>
+                      <td data-c="v" className="px-4 py-2 max-lg:text-[15px]! max-lg:font-normal!">{!u ? "sem acesso" : !u.ativo ? "bloqueado" : travado ? <span className="text-red-700">travado (senha errada)</span> : "ativo"}</td>
                     </tr>
                   );
                 })}

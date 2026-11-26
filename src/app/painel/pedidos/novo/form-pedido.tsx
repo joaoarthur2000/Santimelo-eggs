@@ -1,10 +1,11 @@
 "use client";
 
 import { CampoData } from "@/components/campo-data";
+import { EscolhaPagamento, faltaNoPagamento, pagamentoInicial, paraEnviar, type Pagamento } from "@/components/escolha-pagamento";
 import { useState, useTransition } from "react";
 import { History, Minus, Plus } from "lucide-react";
 import { UNIDADES } from "@/lib/constantes";
-import { criarPedido } from "../actions";
+import { criarPedido, editarPedido } from "../actions";
 
 export type ProdutoCatalogo = {
   id: string;
@@ -17,10 +18,23 @@ export type ProdutoCatalogo = {
   /** quanto de caixa 1 unidade consome (bandeja = 1/12); nulo = não controla estoque */
   fator: number | null;
 };
-type ClienteForm = { id: string; nome: string; precos: Record<string, number>; ultimoPedido: { produtoId: string; quantidade: number }[] };
+type ClienteForm = { id: string; nome: string; forma: string | null; prazo: number | null; precos: Record<string, number>; ultimoPedido: { produtoId: string; quantidade: number }[] };
 type Fornecedor = { id: string; nome: string };
 /** chave "fornecedorId|itemId" → caixas em estoque e custo médio da caixa */
 type PorFornecedor = Record<string, { saldo: number; custo: number | null }>;
+
+/** Pedido já lançado, pra editar */
+export type EdicaoPedido = {
+  id: number;
+  clienteId: string;
+  origem: string;
+  observacao: string;
+  entregue: boolean;
+  /** valor já recebido (trava valor e cliente); nulo = ainda em aberto */
+  pago: number | null;
+  itens: { produtoId: string; quantidade: number; precoUnit: number; fornecedorId: string | null }[];
+  pagamento: Pagamento;
+};
 
 const reais = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const caixas = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} cx`;
@@ -42,20 +56,34 @@ export function FormPedido({
   fornecedores,
   porFornecedor,
   diaInicial,
+  hoje,
+  voltarProDia = false,
+  edicao,
 }: {
   produtos: ProdutoCatalogo[];
   clientes: ClienteForm[];
   fornecedores: Fornecedor[];
   porFornecedor: PorFornecedor;
   diaInicial: string;
+  hoje: string;
+  /** veio do Dia a dia: volta pra lá depois de salvar */
+  voltarProDia?: boolean;
+  edicao?: EdicaoPedido;
 }) {
-  const [clienteId, setClienteId] = useState("");
+  const doPedido = <T,>(f: (i: EdicaoPedido["itens"][number]) => T): Record<string, T> => Object.fromEntries((edicao?.itens ?? []).map((i) => [i.produtoId, f(i)]));
+  const [clienteId, setClienteId] = useState(edicao?.clienteId ?? "");
   const [dia, setDia] = useState(diaInicial);
-  const [origem, setOrigem] = useState<"WHATSAPP" | "PAINEL">("WHATSAPP");
-  const [observacao, setObservacao] = useState("");
-  const [qtd, setQtd] = useState<Record<string, number>>({});
-  const [valor, setValor] = useState<Record<string, string>>({});
-  const [fornecedor, setFornecedor] = useState<Record<string, string>>({});
+  const [origem, setOrigem] = useState<"WHATSAPP" | "PAINEL">(edicao?.origem === "PAINEL" ? "PAINEL" : "WHATSAPP");
+  const [observacao, setObservacao] = useState(edicao?.observacao ?? "");
+  const [pagamento, setPagamento] = useState(() => edicao?.pagamento ?? pagamentoInicial());
+  // dia que já passou: normalmente a entrega já aconteceu
+  const [marcouEntregue, setEntregue] = useState<boolean | null>(edicao ? edicao.entregue : null);
+  const [recebido, setRecebido] = useState(false);
+  const jaChegou = dia <= hoje;
+  const entregue = marcouEntregue ?? dia < hoje;
+  const [qtd, setQtd] = useState<Record<string, number>>(() => doPedido((i) => i.quantidade));
+  const [valor, setValor] = useState<Record<string, string>>(() => doPedido((i) => comoTexto(i.precoUnit)));
+  const [fornecedor, setFornecedor] = useState<Record<string, string>>(() => doPedido((i) => i.fornecedorId ?? ""));
   const [erro, setErro] = useState<string>();
   const [enviando, iniciar] = useTransition();
 
@@ -74,6 +102,7 @@ export function FormPedido({
   function trocarCliente(id: string) {
     setClienteId(id);
     setValor({}); // valores voltam pro combinado do cliente novo
+    setPagamento(pagamentoInicial(clientes.find((c) => c.id === id))); // idem a forma e o prazo
   }
 
   function repetirUltimo() {
@@ -85,20 +114,27 @@ export function FormPedido({
     setErro(undefined);
     if (valorInvalido) return setErro("Confira o valor de cada produto.");
     if (faltaFornecedor) return setErro("Escolha o fornecedor de cada produto.");
+    const falta = faltaNoPagamento(pagamento, dia);
+    if (falta) return setErro(falta);
     iniciar(async () => {
-      const r = await criarPedido({
+      const dados = {
         clienteId,
         dia,
         origem,
         observacao,
+        pagamento: paraEnviar(pagamento, dia),
         itens: linhas.map((p) => ({ produtoId: p.id, quantidade: qtd[p.id], precoUnit: precoDe(p)!, fornecedorId: fornecedor[p.id] })),
-      });
+        entregue: jaChegou || edicao ? entregue : false,
+        recebido: jaChegou && !edicao && recebido,
+        voltarProDia,
+      };
+      const r = edicao ? await editarPedido(edicao.id, dados) : await criarPedido(dados);
       if (r?.erro) setErro(r.erro);
     });
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_380px] [&>*]:min-w-0">
+    <div className="grid gap-4 lg:gap-6 xl:grid-cols-[1fr_380px] [&>*]:min-w-0">
       <section className="cartao divide-y divide-stone-100">
         {produtos.map((p) => {
           const negociado = cliente?.precos[p.id] !== undefined;
@@ -115,14 +151,15 @@ export function FormPedido({
                   {negociado && <span className="ml-1 font-semibold text-green-700">preço combinado</span>}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => mudar(p, -(PASSO[p.unidade] ?? 1))} className="botao-secundario size-9 p-0" aria-label={`Menos ${p.item} ${p.embalagem}`}>
+              <div className="flex items-center gap-2 max-lg:w-full">
+                <button type="button" onClick={() => mudar(p, -(PASSO[p.unidade] ?? 1))} disabled={q === 0} className="botao-secundario size-9 p-0 max-lg:h-12 max-lg:w-14" aria-label={`Menos ${p.item} ${p.embalagem}`}>
                   <Minus className="size-4" />
                 </button>
-                <span className="tabular w-16 text-center font-semibold">
+                <span className="tabular hidden w-16 text-center font-semibold lg:inline">
                   {q} {UNIDADES[p.unidade] ?? p.unidade}
                 </span>
-                <button type="button" onClick={() => mudar(p, PASSO[p.unidade] ?? 1)} className="botao-secundario size-9 p-0" aria-label={`Mais ${p.item} ${p.embalagem}`}>
+                <QuantidadeDigitada valor={q} unidade={UNIDADES[p.unidade] ?? p.unidade} rotulo={`Quantidade de ${p.item} ${p.embalagem}`} aoMudar={(v) => setQtd((x) => ({ ...x, [p.id]: v }))} />
+                <button type="button" onClick={() => mudar(p, PASSO[p.unidade] ?? 1)} className="botao-secundario size-9 p-0 max-lg:h-12 max-lg:w-14" aria-label={`Mais ${p.item} ${p.embalagem}`}>
                   <Plus className="size-4" />
                 </button>
               </div>
@@ -143,7 +180,9 @@ export function FormPedido({
         })}
       </section>
 
-      <aside className="cartao h-fit space-y-4 p-5 xl:sticky xl:top-6">
+      {/* no celular este cartão se abre em dois: cliente e entrega em cima, resumo no fim */}
+      <aside className="h-fit max-xl:contents xl:sticky xl:top-6 xl:space-y-4 xl:rounded-2xl xl:border xl:border-stone-200/80 xl:bg-white xl:p-5 xl:shadow-cartao">
+        <div className="max-xl:order-first max-xl:min-w-0 max-xl:rounded-2xl max-xl:border max-xl:border-stone-200/80 max-xl:bg-white max-xl:p-4 max-xl:shadow-cartao space-y-4">
         <label className="block">
           <span className="text-sm font-medium">Cliente</span>
           <select value={clienteId} onChange={(e) => trocarCliente(e.target.value)} className="campo mt-1">
@@ -155,24 +194,36 @@ export function FormPedido({
             ))}
           </select>
         </label>
-        {cliente && cliente.ultimoPedido.length > 0 && (
+        {edicao?.pago != null && <p className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm text-emerald-900">Já pago ({reais(edicao.pago)}). Pra mudar valor ou cliente, desfaça o pagamento na tela do pedido.</p>}
+        {!edicao && cliente && cliente.ultimoPedido.length > 0 && (
           <button type="button" onClick={repetirUltimo} className="botao-secundario w-full">
             <History className="size-4" /> Repetir o último pedido
           </button>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className={`grid gap-3 ${edicao?.origem === "APP" ? "" : "grid-cols-2"}`}>
           <label className="block">
             <span className="text-sm font-medium">Entrega</span>
             <CampoData value={dia} onChange={setDia} required className="campo mt-1" />
           </label>
-          <label className="block">
-            <span className="text-sm font-medium">Chegou por</span>
-            <select value={origem} onChange={(e) => setOrigem(e.target.value as typeof origem)} className="campo mt-1">
-              <option value="WHATSAPP">WhatsApp</option>
-              <option value="PAINEL">Telefone / balcão</option>
-            </select>
-          </label>
+          {edicao?.origem !== "APP" && (
+            <label className="block">
+              <span className="text-sm font-medium">Chegou por</span>
+              <select value={origem} onChange={(e) => setOrigem(e.target.value as typeof origem)} className="campo mt-1">
+                <option value="WHATSAPP">WhatsApp</option>
+                <option value="PAINEL">Telefone / balcão</option>
+              </select>
+            </label>
+          )}
         </div>
+        <EscolhaPagamento valor={pagamento} entrega={dia} aoMudar={setPagamento} />
+        {(jaChegou || edicao) && (
+          <div className="space-y-1">
+            <Marcador marcado={entregue} aoMudar={setEntregue} texto="Já foi entregue" detalhe="baixa as caixas do estoque no dia da entrega" />
+            {!edicao && <Marcador marcado={recebido} aoMudar={setRecebido} texto="Já recebi o pagamento" detalhe="não fica em aberto" />}
+          </div>
+        )}
+        </div>
+        <div className="max-xl:min-w-0 max-xl:rounded-2xl max-xl:border max-xl:border-stone-200/80 max-xl:bg-white max-xl:p-4 max-xl:shadow-cartao space-y-4">
         <label className="block">
           <span className="text-sm font-medium">Observação</span>
           <textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} rows={2} maxLength={500} className="campo mt-1" />
@@ -200,13 +251,60 @@ export function FormPedido({
           </p>
           <p className="text-xs text-stone-500">Frete grátis</p>
         </div>
-        {erro && <p className="text-sm text-red-600">{erro}</p>}
+        {erro && <p className="text-sm text-red-600 max-lg:hidden">{erro}</p>}
         {!erro && linhas.length > 0 && faltaFornecedor > 0 && <p className="text-xs text-amber-700">Falta escolher o fornecedor de {faltaFornecedor} produto(s).</p>}
-        <button type="button" onClick={enviar} disabled={enviando || !clienteId || linhas.length === 0} className="botao-primario w-full">
-          {enviando ? "Salvando…" : "Salvar pedido"}
+        <button type="button" onClick={enviar} disabled={enviando || !clienteId || linhas.length === 0} className="botao-primario w-full max-lg:hidden">
+          {enviando ? "Salvando…" : edicao ? "Salvar alterações" : "Salvar pedido"}
         </button>
+        </div>
       </aside>
+
+      {erro && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-red-700 lg:hidden">{erro}</p>}
+      <div className="acao-fixa lg:hidden">
+        <span className="min-w-0">
+          <span className="block text-sm leading-tight text-stone-500">{linhas.length ? (!clienteId ? "falta o cliente" : faltaFornecedor ? "falta o fornecedor" : faltaNoPagamento(pagamento, dia) ? "falta o pagamento" : "Total") : "Total"}</span>
+          <span className="tabular block text-lg leading-tight font-bold text-marca-950">{reais(total)}</span>
+        </span>
+        <button type="button" onClick={enviar} disabled={enviando || !clienteId || linhas.length === 0} className="botao-primario flex-1">
+          {enviando ? "Salvando…" : edicao ? "Salvar alterações" : "Salvar pedido"}
+        </button>
+      </div>
     </div>
+  );
+}
+
+function Marcador({ marcado, aoMudar, texto, detalhe }: { marcado: boolean; aoMudar: (v: boolean) => void; texto: string; detalhe: string }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5 py-1.5">
+      <input type="checkbox" checked={marcado} onChange={(e) => aoMudar(e.target.checked)} className="mt-0.5 size-[18px] shrink-0 accent-marca-900 max-lg:size-6" />
+      <span className="text-sm font-medium">
+        {texto} <span className="block text-xs font-normal text-stone-500">{detalhe}</span>
+      </span>
+    </label>
+  );
+}
+
+/** Celular: quantidade digitada direto (10 caixas não são 20 toques no +). Aceita "2,5" */
+function QuantidadeDigitada({ valor, unidade, rotulo, aoMudar }: { valor: number; unidade: string; rotulo: string; aoMudar: (v: number) => void }) {
+  const [texto, setTexto] = useState<string | null>(null);
+  return (
+    <label className="relative flex-1 lg:hidden">
+      <input
+        inputMode="decimal"
+        aria-label={rotulo}
+        value={texto ?? (valor ? String(valor).replace(".", ",") : "")}
+        placeholder="0"
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => {
+          const t = e.target.value.replace(/[^\d.,]/g, "");
+          setTexto(t);
+          aoMudar(Math.round((numero(t) ?? 0) * 10) / 10);
+        }}
+        onBlur={() => setTexto(null)}
+        className="campo tabular h-12 pr-14 text-center font-semibold"
+      />
+      <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-stone-500">{unidade}</span>
+    </label>
   );
 }
 

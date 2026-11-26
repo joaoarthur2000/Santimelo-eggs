@@ -1,6 +1,8 @@
 "use client";
 
 import { CampoData } from "@/components/campo-data";
+import { useFormulario } from "@/components/formulario";
+import { PreencherPeloGoogle } from "./clientes/preencher-google";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { CIDADES, DIAS_SEMANA, FORMAS_PAGAMENTO, PRAZOS_PAGAMENTO, TIPOS_NEGOCIO } from "@/lib/constantes";
 import {
@@ -19,7 +21,7 @@ import {
   testarWhatsapp,
 } from "./actions";
 
-type Estado = { erro?: string; ok?: number; senha?: string; codigo?: string };
+type Estado = { erro?: string; ok?: number; senha?: string; codigo?: string; campos?: Record<string, string>; avisos?: Record<string, string>; falta?: string[] };
 type Regiao = { id: string; nome: string };
 
 function useLimpar(ok?: number) {
@@ -32,7 +34,13 @@ function useLimpar(ok?: number) {
 
 function Retorno({ estado, salvo = "Salvo." }: { estado: Estado; salvo?: string }) {
   if (estado.erro) return <p className="text-sm text-red-600">{estado.erro}</p>;
-  if (estado.ok && !estado.senha) return <p className="text-sm text-marca-700">{salvo}</p>;
+  if (estado.ok && !estado.senha)
+    return (
+      <p className="text-sm text-marca-700" role="status">
+        {salvo}
+        {!!estado.falta?.length && <span className="text-stone-500"> Ainda falta {estado.falta.join(", ")}.</span>}
+      </p>
+    );
   return null;
 }
 
@@ -93,21 +101,21 @@ function CamposDados({ inicial }: { inicial?: Partial<Dados> }) {
         <input name="cnpj" inputMode="numeric" defaultValue={v(inicial?.cnpj)} placeholder="00.000.000/0000-00" className="campo mt-1" />
       </label>
       <label className={rotulo}>
-        Responsável *
-        <input name="responsavel" required defaultValue={v(inicial?.responsavel)} placeholder="Nome no aviso do app" className="campo mt-1" />
+        Responsável
+        <input name="responsavel" defaultValue={v(inicial?.responsavel)} placeholder="Nome no aviso do app" className="campo mt-1" />
       </label>
       <label className={rotulo}>
-        WhatsApp *
-        <input name="whatsapp" required inputMode="tel" defaultValue={v(inicial?.whatsapp)} placeholder="(51) 99999-9999" className="campo mt-1" />
+        WhatsApp
+        <input name="whatsapp" inputMode="tel" defaultValue={v(inicial?.whatsapp)} placeholder="(51) 99999-9999" className="campo mt-1" />
       </label>
       <label className={rotulo}>
-        Tipo de negócio *
-        <select name="tipoNegocio" required defaultValue={inicial?.tipoNegocio ?? ""} className="campo mt-1">
-          <option value="" disabled>Escolha…</option>
+        Tipo de negócio
+        <select name="tipoNegocio" defaultValue={inicial?.tipoNegocio === "A definir" ? "" : (inicial?.tipoNegocio ?? "")} className="campo mt-1">
+          <option value="">A definir</option>
           {TIPOS_NEGOCIO.map((t) => (
             <option key={t}>{t}</option>
           ))}
-          {inicial?.tipoNegocio && !(TIPOS_NEGOCIO as readonly string[]).includes(inicial.tipoNegocio) && <option>{inicial.tipoNegocio}</option>}
+          {inicial?.tipoNegocio && inicial.tipoNegocio !== "A definir" && !(TIPOS_NEGOCIO as readonly string[]).includes(inicial.tipoNegocio) && <option>{inicial.tipoNegocio}</option>}
         </select>
       </label>
       <label className={rotulo}>
@@ -115,16 +123,16 @@ function CamposDados({ inicial }: { inicial?: Partial<Dados> }) {
         <input name="email" type="email" defaultValue={v(inicial?.email)} className="campo mt-1" />
       </label>
       <label className={`${rotulo} col-span-2`}>
-        Endereço de entrega *
-        <input name="endereco" required defaultValue={v(inicial?.endereco)} placeholder="Rua, número e complemento" className="campo mt-1" />
+        Endereço de entrega
+        <input name="endereco" defaultValue={v(inicial?.endereco)} placeholder="Rua, número e complemento" className="campo mt-1" />
       </label>
       <label className={rotulo}>
-        Bairro *
-        <input name="bairro" required defaultValue={v(inicial?.bairro)} className="campo mt-1" />
+        Bairro
+        <input name="bairro" defaultValue={v(inicial?.bairro)} className="campo mt-1" />
       </label>
       <label className={rotulo}>
-        Cidade *
-        <input name="cidade" required list="cidades-dados" defaultValue={inicial?.cidade ?? "Porto Alegre"} className="campo mt-1" />
+        Cidade
+        <input name="cidade" list="cidades-dados" defaultValue={inicial?.cidade ?? "Porto Alegre"} className="campo mt-1" />
         <datalist id="cidades-dados">
           {CIDADES.map((c) => (
             <option key={c} value={c} />
@@ -210,12 +218,13 @@ function CamposCondicoes({ regioes, inicial }: { regioes: Regiao[]; inicial?: Co
 }
 
 export function FormDados({ clienteId, inicial }: { clienteId: string; inicial: Dados }) {
-  const [estado, acao, enviando] = useActionState<Estado, FormData>(salvarDados.bind(null, clienteId), {});
+  const { estado, enviando, ref, aoEnviar } = useFormulario<Estado>(salvarDados.bind(null, clienteId), {});
   return (
-    <form action={acao} className="space-y-3">
+    <form ref={ref} onSubmit={aoEnviar} noValidate className="space-y-3">
+      <PreencherPeloGoogle formulario={ref} nome={inicial.nomeFantasia} />
       <CamposDados inicial={inicial} />
       <div className="flex items-center gap-3">
-        <button disabled={enviando} className="botao-primario">Salvar dados</button>
+        <button disabled={enviando} className="botao-primario">{enviando ? "Salvando…" : "Salvar dados"}</button>
         <Retorno estado={estado} />
       </div>
     </form>
@@ -223,12 +232,12 @@ export function FormDados({ clienteId, inicial }: { clienteId: string; inicial: 
 }
 
 export function FormCondicoes({ clienteId, regioes, inicial }: { clienteId: string; regioes: Regiao[]; inicial: Condicoes }) {
-  const [estado, acao, enviando] = useActionState<Estado, FormData>(salvarCondicoes.bind(null, clienteId), {});
+  const { estado, enviando, ref, aoEnviar } = useFormulario<Estado>(salvarCondicoes.bind(null, clienteId), {});
   return (
-    <form action={acao} className="space-y-3">
+    <form ref={ref} onSubmit={aoEnviar} className="space-y-3">
       <CamposCondicoes regioes={regioes} inicial={inicial} />
       <div className="flex items-center gap-3">
-        <button disabled={enviando} className="botao-primario">Salvar negociação</button>
+        <button disabled={enviando} className="botao-primario">{enviando ? "Salvando…" : "Salvar negociação"}</button>
         <Retorno estado={estado} />
       </div>
     </form>

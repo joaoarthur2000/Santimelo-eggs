@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { diaISO, inicioDoDia } from "@/lib/datas";
 import { db } from "@/lib/db";
+import { errosDoForm } from "@/lib/erros";
 import { saldos } from "@/lib/estoque";
 import { exigirPapel } from "@/lib/sessao";
 
-type Estado = { erro?: string; ok?: number };
+type Estado = { erro?: string; ok?: number; campos?: Record<string, string> };
 // "130", "130,50", "1.250,00" → número
 const numero = (v: FormDataEntryValue | null) => {
   const t = String(v ?? "").trim().replace(/\s/g, "");
@@ -51,7 +52,7 @@ export async function registrarCompra(_e: Estado, form: FormData): Promise<Estad
     fornecedorId: texto(form.get("fornecedorId")) ?? "",
     observacao: texto(form.get("observacao")),
   });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   const data = dataDoDia(form.get("dia"));
   if ("erro" in data) return data;
   const fornecedor = await db.fornecedor.findUnique({ where: { id: r.data.fornecedorId } });
@@ -77,7 +78,7 @@ export async function registrarPerda(_e: Estado, form: FormData): Promise<Estado
     observacao: texto(form.get("observacao")) ?? "",
     fornecedorId: texto(form.get("fornecedorId")),
   });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   const data = dataDoDia(form.get("dia"));
   if ("erro" in data) return data;
   // saiu de um fornecedor? baixa também o estoque dele
@@ -96,7 +97,7 @@ export async function registrarContagem(_e: Estado, form: FormData): Promise<Est
   const r = z
     .object({ itemId: z.string().min(1, "Escolha o item"), contado: z.number("Informe quanto tem").min(0, "Quantidade inválida").max(100000) })
     .safeParse({ itemId: texto(form.get("itemId")) ?? "", contado: numero(form.get("contado")) });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   const saldo = (await saldos(new Date())).get(r.data.itemId) ?? 0;
   const diferenca = Math.round((r.data.contado - saldo) * 1000) / 1000;
   if (diferenca === 0) return { ok: Date.now() };

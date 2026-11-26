@@ -1,5 +1,6 @@
 "use client";
 
+import { useEstreito } from "./use-estreito";
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { COR_CUSTO, COR_LUCRO } from "@/lib/cores";
 
@@ -31,6 +32,7 @@ function Dica({ active, payload }: { active?: boolean; payload?: { payload: Linh
  */
 export function GraficoVendas({ dados, horizontal = false, destaque, altura = 280 }: { dados: LinhaVendas[]; horizontal?: boolean; destaque?: number; altura?: number }) {
   const eixoTexto = { fontSize: 12, fill: "#57534e" };
+  const estreito = useEstreito();
   const opacidade = (i: number) => (destaque === undefined || destaque === i ? 1 : 0.35);
   return (
     <div>
@@ -40,17 +42,17 @@ export function GraficoVendas({ dados, horizontal = false, destaque, altura = 28
         <li className="text-stone-500">barra inteira = faturamento</li>
       </ul>
       <ResponsiveContainer width="100%" height={altura}>
-        <BarChart data={dados} layout={horizontal ? "vertical" : "horizontal"} stackOffset="sign" margin={{ top: 4, right: 12, bottom: 0, left: 0 }} barCategoryGap="22%">
+        <BarChart data={dados} layout={horizontal ? "vertical" : "horizontal"} stackOffset="sign" margin={{ top: 4, right: estreito ? 4 : 12, bottom: 0, left: 0 }} barCategoryGap="22%">
           <CartesianGrid stroke="#ece7e1" vertical={horizontal} horizontal={!horizontal} />
           {horizontal ? (
             <>
               <XAxis type="number" tickFormatter={reais} tick={eixoTexto} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="rotulo" width={170} tick={eixoTexto} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="rotulo" width={estreito ? 108 : 170} tick={eixoTexto} axisLine={false} tickLine={false} />
             </>
           ) : (
             <>
               <XAxis dataKey="rotulo" tick={eixoTexto} axisLine={false} tickLine={false} minTickGap={8} />
-              <YAxis tickFormatter={reais} tick={eixoTexto} axisLine={false} tickLine={false} width={76} />
+              <YAxis tickFormatter={reais} tick={eixoTexto} axisLine={false} tickLine={false} width={estreito ? 56 : 76} />
             </>
           )}
           <ReferenceLine {...(horizontal ? { x: 0 } : { y: 0 })} stroke="#a8a29e" />

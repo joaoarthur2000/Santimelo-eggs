@@ -1,4 +1,5 @@
 import "server-only";
+import { CONDICOES_DO_PEDIDO, pagamentoDoPedido } from "./pagamento";
 import { DIAS_SEMANA, ehOvo, type Periodo } from "./constantes";
 import { pedidosNoPeriodo } from "./consultas";
 import { diaDaSemana, diaISO, fimDoDia, formatarDia, inicioDoDia, somarDias } from "./datas";
@@ -144,16 +145,16 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
       porCliente.set(p.clienteId, cli);
       somar(grupo(porTipo, p.cliente.tipoNegocio), custo);
       somar(grupo(porNota, p.notaFiscal ? "Com NF" : "Sem NF"), custo);
-      somar(grupo(porCondicao, p.cliente.prazoPagamentoDias ? "A prazo" : "À vista"), custo);
-      somar(grupo(porPagamento, p.cliente.formaPagamento ?? "Não informado"), custo);
+      somar(grupo(porCondicao, CONDICOES_DO_PEDIDO[pagamentoDoPedido(p, p.cliente).condicao]), custo);
+      somar(grupo(porPagamento, pagamentoDoPedido(p, p.cliente).forma ?? "Não informado"), custo);
     }
     const cli = porCliente.get(p.clienteId);
     if (noPeriodo && cli) {
       cli.pedidos += 1;
       grupo(porTipo, p.cliente.tipoNegocio).pedidos += 1;
       grupo(porNota, p.notaFiscal ? "Com NF" : "Sem NF").pedidos += 1;
-      grupo(porCondicao, p.cliente.prazoPagamentoDias ? "A prazo" : "À vista").pedidos += 1;
-      grupo(porPagamento, p.cliente.formaPagamento ?? "Não informado").pedidos += 1;
+      grupo(porCondicao, CONDICOES_DO_PEDIDO[pagamentoDoPedido(p, p.cliente).condicao]).pedidos += 1;
+      grupo(porPagamento, pagamentoDoPedido(p, p.cliente).forma ?? "Não informado").pedidos += 1;
     }
   }
 
@@ -211,7 +212,7 @@ export async function relatorioVendas(periodo: Periodo, dia: string) {
     compras: { caixas: caixasCompradas, valor: compras.reduce((s, m) => s + m.quantidade * (m.custoUnit ?? 0), 0) },
     porFaixa: faixa.faixas.map((f) => {
       const s = porFaixa.get(f.chave)!;
-      return { faixa: f.rotulo, faturamento: Math.round(s.faturamento), custo: Math.round(s.custo), lucro: Math.round(lucroDe(s)), semCusto: Math.round(s.semCusto) };
+      return { dia: f.chave, faixa: f.rotulo, faturamento: Math.round(s.faturamento), custo: Math.round(s.custo), lucro: Math.round(lucroDe(s)), semCusto: Math.round(s.semCusto) };
     }),
     porProduto: [...porProduto.values()].map(comLucro).sort((a, b) => a.ordem - b.ordem || b.faturamento - a.faturamento),
     porCliente: [...porCliente.values()].map(comLucro).sort((a, b) => b.faturamento - a.faturamento),

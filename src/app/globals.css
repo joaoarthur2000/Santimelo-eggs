@@ -198,8 +198,10 @@ body {
   .painel table tbody tr {
     transition: background-color 120ms ease-out;
   }
-  .painel table tbody tr:hover {
-    background-color: rgb(250 247 242);
+  @media (hover: hover) {
+    .painel table tbody tr:hover {
+      background-color: rgb(250 247 242);
+    }
   }
   .painel :where(a, button, summary, [role="tab"]):focus-visible {
     outline: 2px solid rgb(163 130 106 / 0.6);
@@ -312,4 +314,235 @@ body {
   .painel-entra > *, .esqueleto::after, .pulso::before { animation: none; }
   .dialogo, .dialogo::backdrop { transition: none; }
   .cartao-link, .botao-primario, .botao-secundario { transition: none; }
+}
+
+/* Campo com erro (components/formulario.ts) */
+.campo[aria-invalid="true"],
+.campo[aria-invalid="true"]:focus { border-color: #dc2626; box-shadow: 0 0 0 3px rgb(220 38 38 / 0.12); }
+.erro-campo, .aviso-campo { display: block; margin-top: 4px; font-size: 0.8125rem; font-weight: 500; color: #b91c1c; }
+.campo[data-aviso] { border-color: #d97706; }
+.aviso-campo { color: #92400e; }
+
+/* ───────── Painel no celular (iPhone, tela inicial) ─────────
+   Fora de @layer de propósito: vence os utilitários sem !important. No computador nada disto vale. */
+
+/* Folha que sobe do rodapé (components/folha.tsx) */
+.folha {
+  margin: auto auto 0;
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100dvh - env(safe-area-inset-top) - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 24px 24px 0 0;
+  padding-bottom: max(env(safe-area-inset-bottom), 12px);
+  background: #fff;
+  color: inherit;
+  transition: transform 260ms var(--ease-suave);
+}
+@starting-style {
+  .folha[open] { transform: translateY(100%); }
+}
+.folha[data-fechando] { transform: translateY(100%) !important; transition-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+.folha[data-arrastando] { transition: none; }
+.folha:focus { outline: none; }
+.folha::backdrop { background: rgb(20 12 8 / 0.5); transition: opacity 260ms ease-out; }
+@starting-style {
+  .folha[open]::backdrop { opacity: 0; }
+}
+.folha[data-fechando]::backdrop { opacity: 0; }
+.folha-alca {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 14px;
+  touch-action: none;
+  cursor: grab;
+}
+
+@media (max-width: 1023.98px) {
+  html:has(.painel) {
+    background: #f7f5f1;
+    overscroll-behavior-y: none; /* quem puxa pra atualizar é o próprio painel */
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: calc(env(safe-area-inset-top) + 60px);
+  }
+  html:has(dialog[open]) { overflow: hidden; }
+
+  .painel {
+    --barra: 56px;
+    --rodape: max(calc(env(safe-area-inset-bottom) - 8px), 6px);
+    /* leitura: nada abaixo de 13px */
+    --text-xs: 0.8125rem;
+    --text-sm: 0.9375rem;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .painel :is(button, a, summary, label) { -webkit-touch-callout: none; }
+  .painel :is(button, .abas-celular) { user-select: none; -webkit-user-select: none; }
+  .painel main { padding-bottom: calc(var(--barra) + var(--rodape) + 28px); }
+  .painel main .uppercase { text-transform: none; letter-spacing: 0; }
+
+  .topo-celular { padding-top: env(safe-area-inset-top); }
+  .abas-celular {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 0 4px var(--rodape);
+    background: #fffdfa;
+    border-top: 1px solid rgb(64 41 36 / 0.12);
+    transition: transform 200ms var(--ease-suave);
+  }
+  html[data-teclado] :is(.abas-celular, .acao-fixa) { transform: translateY(140%); }
+
+  .puxador {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 9999px;
+    background: #fff;
+    color: var(--color-terra);
+    box-shadow: var(--shadow-flutua);
+    opacity: 0;
+    transform: translate(-50%, -52px);
+    transition: transform 240ms var(--ease-suave), opacity 200ms ease-out;
+    pointer-events: none;
+  }
+  .puxador-ativo { opacity: 1; transform: translate(-50%, 12px); }
+
+  /* Ação principal da tela, no alcance do polegar, logo acima da barra */
+  .acao-fixa {
+    position: fixed;
+    inset: auto 0 calc(var(--barra) + var(--rodape) + 1px);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #fffdfa;
+    border-top: 1px solid rgb(64 41 36 / 0.12);
+    transition: transform 200ms var(--ease-suave);
+  }
+  .painel main:has(.acao-fixa) { padding-bottom: calc(var(--barra) + var(--rodape) + 104px); }
+
+  /* Toque: campos de 16px (abaixo disso o iPhone dá zoom) e alvos de 44px */
+  .campo,
+  .painel :is(input:not([type="checkbox"], [type="radio"]), select, textarea) { font-size: 16px; }
+  .campo { min-height: 46px; }
+  textarea.campo { min-height: 84px; }
+  select.campo {
+    appearance: none;
+    padding-right: 36px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2378716c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+  .painel :is(.botao-primario, .botao-secundario) { min-height: 46px; min-width: 46px; font-size: 16px; }
+  .painel :is(.botao-primario, .botao-secundario).px-2 { padding-inline: 10px; font-size: 15px; }
+  .painel .botao-armado { background: var(--color-folha); border-color: var(--color-folha); color: #fff; }
+  .painel label { font-size: 15px; }
+  .campo-busca::-webkit-search-cancel-button { display: none; }
+  /* link de texto pequeno: a área do dedo cresce sem mexer no desenho */
+  .toque { position: relative; }
+  .toque::after { content: ""; position: absolute; inset: -13px -10px; }
+
+  /* Troca de tela: aparece junto e rápido (no computador sobe em cascata) */
+  .painel-entra > * { animation-duration: 220ms; animation-delay: 0ms !important; }
+
+  /* Tabela vira lista: cada linha é um bloco com título, valor e detalhes (td data-c) */
+  .lista-cel,
+  .lista-cel > :is(tbody, tfoot) { display: block; width: 100%; }
+  .lista-cel > thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .lista-cel > :is(tbody, tfoot) > tr {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 12px;
+    align-items: center;
+    padding: 13px 16px;
+  }
+  .lista-cel > :is(tbody, tfoot) > tr > td {
+    display: block;
+    grid-column: 1 / -1;
+    padding: 0;
+    max-width: none;
+    text-align: left;
+    white-space: normal;
+  }
+  .lista-cel > :is(tbody, tfoot) > tr > td[data-c="t"] { grid-column: 1; font-size: 16px; font-weight: 600; color: var(--color-marca-950); }
+  .lista-cel > :is(tbody, tfoot) > tr > td[data-c="v"] { grid-column: 2; grid-row: 1; align-self: start; text-align: right; font-size: 16px; font-weight: 600; }
+  .lista-cel > :is(tbody, tfoot) > tr > td[data-c="s"] { grid-column: 1; font-size: 15px; color: #57534e; }
+  .lista-cel > :is(tbody, tfoot) > tr > td[data-c="l"] { grid-column: 2; text-align: right; }
+  .lista-cel > :is(tbody, tfoot) > tr > td[data-c="p"] { display: flex; justify-content: space-between; gap: 16px; font-size: 15px; text-align: right; }
+  .lista-cel > :is(tbody, tfoot) > tr > td[data-c="p"]::before { content: attr(data-r); flex: none; color: #57534e; font-weight: 400; text-align: left; }
+  .lista-cel > :is(tbody, tfoot) > tr > td[data-c="a"] { padding-top: 8px; }
+  .lista-cel > :is(tbody, tfoot) > tr > td[data-c="x"] { display: none; }
+  .lista-cel > tbody > tr > td[colspan]:not([data-c]) { padding: 20px 0; text-align: center; }
+  /* linha inteira abre o item */
+  .lista-cel tr:has(.linha-toque) { padding-right: 40px; }
+  .lista-cel tr:has(.linha-toque)::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 18px;
+    width: 8px;
+    height: 8px;
+    border: solid #a8a29e;
+    border-width: 2px 2px 0 0;
+    transform: translateY(-50%) rotate(45deg);
+  }
+  .lista-cel .linha-toque::after { content: ""; position: absolute; inset: 0; }
+  .lista-cel tr:has(.linha-toque:active) { background: #f5f1ea; }
+  .lista-cel :is(button, select, a:not(.linha-toque)) { position: relative; z-index: 1; }
+
+  /* Cartões lado a lado que passam com o dedo */
+  .trilho {
+    display: flex;
+    gap: 12px;
+    margin-inline: -16px;
+    padding: 2px 16px 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 16px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .trilho::-webkit-scrollbar { display: none; }
+  .trilho > * { flex: 0 0 84%; scroll-snap-align: start; }
+
+  /* Janela (<dialog>) sobe do rodapé, como folha */
+  .dialogo {
+    margin: auto auto 0;
+    width: 100%;
+    max-width: 560px;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 24px);
+    border-radius: 24px 24px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior: contain;
+    transform: translateY(40px);
+  }
+  @starting-style {
+    .dialogo[open] { transform: translateY(40px); }
+  }
+}
+
+/* Dedo: tocar no campo de data abre o seletor do próprio iPhone */
+@media (pointer: coarse) {
+  .data-nativa {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+    appearance: none;
+  }
+  .data-botao { pointer-events: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folha, .folha::backdrop, .abas-celular, .acao-fixa, .puxador { transition: none; }
 }

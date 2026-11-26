@@ -37,10 +37,12 @@ export default async function Despesas({ searchParams }: PageProps<"/painel/desp
 
   return (
     <>
-      <Cabecalho titulo="Despesas" subtitulo="Gastos da operação fora a compra de mercadoria. O combustível entra sozinho pelas Rotas.">
+      <Cabecalho titulo="Despesas" explica subtitulo="Gastos da operação fora a compra de mercadoria. O combustível entra sozinho pelas Rotas.">
+        <div className="flex items-center justify-between gap-2 max-lg:w-full">
         <Link href={`/painel/despesas?mes=${antes}`} className="botao-secundario px-2" aria-label="Mês anterior"><ChevronLeft className="size-4" /></Link>
-        <span className="min-w-36 text-center font-semibold capitalize text-marca-950">{MESES[m - 1]} de {ano}</span>
+        <span className="min-w-36 text-center font-semibold text-marca-950"><span className="capitalize">{MESES[m - 1]}</span> de {ano}</span>
         <Link href={`/painel/despesas?mes=${mesMais(mes, 1)}`} className="botao-secundario px-2" aria-label="Próximo mês"><ChevronRight className="size-4" /></Link>
+        </div>
       </Cabecalho>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 [&>*]:min-w-0">
@@ -50,29 +52,29 @@ export default async function Despesas({ searchParams }: PageProps<"/painel/desp
         <Indicador rotulo="Média por dia" valor={reais(total / Number(fim.slice(8, 10)))} detalhe="no mês" />
       </section>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr] [&>*]:min-w-0">
+      <div className="mt-4 grid gap-4 lg:mt-6 lg:grid-cols-[2fr_1fr] lg:gap-6 [&>*]:min-w-0">
         <section className="cartao overflow-x-auto">
           <h2 className="px-5 pt-5 font-semibold text-marca-950">Lançamentos</h2>
           {despesas.length === 0 ? (
             <div className="p-5"><Vazio>Nenhuma despesa lançada neste mês.</Vazio></div>
           ) : (
-            <table className="mt-3 w-full text-sm">
+            <table className="lista-cel mt-3 w-full text-sm">
               <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
                 <tr><th className="px-4 py-2">Data</th><th className="px-4 py-2">Despesa</th><th className="px-4 py-2">Categoria</th><th className="px-4 py-2 text-right">Valor</th><th className="px-2 py-2" /></tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {despesas.map((d) => (
                   <tr key={d.id}>
-                    <td className="tabular whitespace-nowrap px-4 py-2.5 text-stone-600">{d.dia.slice(8, 10)}/{d.dia.slice(5, 7)}</td>
-                    <td className="px-4 py-2.5">
+                    <td data-c="s" className="tabular order-2 whitespace-nowrap px-4 py-2.5 text-stone-600">{d.dia.slice(8, 10)}/{d.dia.slice(5, 7)}</td>
+                    <td data-c="t" className="px-4 py-2.5">
                       <span className="font-medium">{d.descricao}</span>
-                      <span className="block text-xs text-stone-500">{[d.formaPagamento, d.autor].filter(Boolean).join(" · ")}</span>
+                      <span className="block text-xs font-normal text-stone-500">{[d.formaPagamento, d.autor].filter(Boolean).join(" · ")}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-stone-600">{d.categoria}</td>
-                    <td className="tabular px-4 py-2.5 text-right font-semibold">{reais(d.valor)}</td>
-                    <td className="px-2 py-2.5 text-right">
+                    <td data-c="x" className="px-4 py-2.5 text-stone-600">{d.categoria}</td>
+                    <td data-c="v" className="tabular px-4 py-2.5 text-right font-semibold">{reais(d.valor)}</td>
+                    <td data-c="l" className="px-2 py-2.5 text-right">
                       <form action={excluirDespesa.bind(null, d.id)}>
-                        <button className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600" aria-label={`Apagar ${d.descricao}`}><Trash2 className="size-4" /></button>
+                        <button className="toque rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600" aria-label={`Apagar ${d.descricao}`}><Trash2 className="size-4" /></button>
                       </form>
                     </td>
                   </tr>
@@ -82,8 +84,8 @@ export default async function Despesas({ searchParams }: PageProps<"/painel/desp
           )}
         </section>
 
-        <aside className="space-y-6">
-          <section className="cartao p-5">
+        <aside className="space-y-4 max-lg:contents lg:space-y-6">
+          <section id="lancar" className="cartao scroll-mt-24 p-5 max-lg:order-first">
             <h2 className="mb-3 font-semibold text-marca-950">Lançar despesa</h2>
             <FormDespesa hoje={hoje} />
           </section>

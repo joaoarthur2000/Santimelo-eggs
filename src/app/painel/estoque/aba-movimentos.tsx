@@ -37,7 +37,7 @@ export async function AbaMovimentos({ sp }: { sp: Record<string, string | string
 
   return (
     <section className="cartao overflow-hidden">
-      <form className="flex flex-wrap items-end gap-3 border-b border-stone-100 p-4">
+      <form className="flex flex-wrap items-end gap-3 border-b border-stone-100 p-4 max-lg:[&>label]:flex-[1_1_42%] max-lg:[&_select]:w-full">
         <input type="hidden" name="aba" value="movimentos" />
         <label className="text-xs font-medium text-stone-500">
           Tipo
@@ -66,7 +66,7 @@ export async function AbaMovimentos({ sp }: { sp: Record<string, string | string
           </select>
         </label>
         <button className="botao-secundario">Filtrar</button>
-        <dl className="ml-auto flex flex-wrap gap-x-6 gap-y-1 text-right text-xs">
+        <dl className="ml-auto flex flex-wrap gap-x-6 gap-y-1 text-right text-xs max-lg:ml-0 max-lg:w-full max-lg:justify-between max-lg:text-left">
           <div>
             <dt className="text-stone-400">Entrou</dt>
             <dd className="tabular text-base font-semibold text-emerald-700">+{num(redondo(entradas))} cx</dd>
@@ -88,7 +88,7 @@ export async function AbaMovimentos({ sp }: { sp: Record<string, string | string
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="lista-cel w-full text-sm">
             <thead className="border-b border-stone-200 text-left text-[11px] text-stone-500 uppercase">
               <tr>
                 <th className="px-4 py-3">Data</th>
@@ -107,24 +107,24 @@ export async function AbaMovimentos({ sp }: { sp: Record<string, string | string
                 const Icone = t.icone;
                 return (
                   <tr key={m.id}>
-                    <td className="tabular px-4 py-3 whitespace-nowrap text-stone-600">
+                    <td data-c="s" className="tabular order-2 px-4 py-3 whitespace-nowrap text-stone-600">
                       {formatarDataCurta(m.data)} <span className="text-stone-400">{formatarHora(m.data)}</span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td data-c="l" className="order-3 px-4 py-3">
                       <span className={`etiqueta ring-1 ring-inset ${t.cor}`}>
                         <Icone className="size-3" /> {t.rotulo}
                       </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td data-c="t" className="px-4 py-3 whitespace-nowrap">
                       <span className="flex items-center gap-2">
                         <Codigo codigo={m.item.codigo} /> {m.item.nome}
                       </span>
                     </td>
-                    <td className={`tabular px-4 py-3 text-right font-semibold whitespace-nowrap ${m.quantidade > 0 ? "text-emerald-700" : "text-stone-800"}`}>
+                    <td data-c="v" className={`tabular px-4 py-3 text-right font-semibold whitespace-nowrap ${m.quantidade > 0 ? "text-emerald-700" : "text-stone-800"}`}>
                       {m.quantidade > 0 ? "+" : "−"}
                       {qtd(Math.abs(m.quantidade), m.item.unidadeEstoque)}
                     </td>
-                    <td className="px-4 py-3 text-stone-600">
+                    <td data-c="s" className="order-4 px-4 py-3 text-stone-600">
                       {m.pedido ? (
                         <Link href={`/painel/pedidos/${m.pedido.id}`} className="font-medium text-marca-700 hover:underline">
                           #{m.pedido.id} · {m.pedido.cliente.nomeFantasia}
@@ -134,7 +134,7 @@ export async function AbaMovimentos({ sp }: { sp: Record<string, string | string
                       )}
                       {m.pedido && m.fornecedor && <span className="block text-xs text-stone-400">de {m.fornecedor}</span>}
                     </td>
-                    <td className="tabular px-4 py-3 text-right whitespace-nowrap text-stone-700">
+                    <td data-c={m.custoUnit === null ? "x" : "l"} className="tabular order-5 px-4 py-3 text-right whitespace-nowrap text-stone-700">
                       {m.custoUnit !== null ? (
                         <>
                           {reais(m.quantidade * m.custoUnit)}
@@ -144,10 +144,10 @@ export async function AbaMovimentos({ sp }: { sp: Record<string, string | string
                         "—"
                       )}
                     </td>
-                    <td className="max-w-64 px-4 py-3 text-xs text-stone-500">
+                    <td data-c={m.pedido ? "x" : undefined} className="order-6 max-w-64 px-4 py-3 text-xs text-stone-500 empty:hidden">
                       {[m.marca && `Marca ${m.marca}`, m.observacao, m.autor].filter(Boolean).join(" · ")}
                     </td>
-                    <td className="px-2 py-3 text-right">{["COMPRA", "PERDA", "AJUSTE"].includes(m.tipo) && <ExcluirLancamento id={m.id} />}</td>
+                    <td data-c="x" className="px-2 py-3 text-right">{["COMPRA", "PERDA", "AJUSTE"].includes(m.tipo) && <ExcluirLancamento id={m.id} />}</td>
                   </tr>
                 );
               })}

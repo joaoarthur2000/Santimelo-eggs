@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Fuel, Trash2, TriangleAlert, Wrench, CalendarRange } from "lucide-react";
+import { Recolhe } from "@/components/recolhe";
 import { Cabecalho, Vazio } from "@/components/ui";
 import { PERIODOS, TIPOS_GASTO_VEICULO, type Periodo, type TipoGastoVeiculo } from "@/lib/constantes";
 import { COR_CUSTO } from "@/lib/cores";
@@ -85,7 +86,7 @@ export default async function Veiculos({ searchParams }: PageProps<"/painel/veic
 
       {c.diasSemRota > 0 && (
         <p className="mb-6 flex items-center gap-2 rounded-xl bg-ouro/15 px-4 py-3 text-sm text-noz">
-          <TriangleAlert className="size-4 shrink-0" /> {c.diasSemRota} dia(s) com entrega sem rota gerada: o km desses dias ficou zerado. Gere a rota em <Link href="/painel/rotas" className="font-semibold underline">Rotas</Link> ou anote o hodômetro.
+          <TriangleAlert className="size-4 shrink-0" /> <span>{c.diasSemRota} dia(s) com entrega sem rota gerada: o km desses dias ficou zerado. Gere a rota em <Link href="/painel/rotas" className="font-semibold underline">Rotas</Link> ou anote o hodômetro.</span>
         </p>
       )}
 
@@ -109,59 +110,65 @@ export default async function Veiculos({ searchParams }: PageProps<"/painel/veic
         </dl>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[3fr_2fr] [&>*]:min-w-0">
-        <div className="space-y-6 [&>*]:min-w-0">
+      <div className="grid gap-4 lg:gap-6 xl:grid-cols-[3fr_2fr] [&>*]:min-w-0">
+        <div className="space-y-4 lg:space-y-6 [&>*]:min-w-0">
           {/* Por cliente */}
           <section className="cartao overflow-x-auto">
-            <h2 className="px-5 pt-5 font-semibold text-terra">Custo de entrega por cliente</h2>
-            <p className="px-5 text-xs text-stone-500">O custo de cada dia de entrega é dividido entre os clientes atendidos naquele dia.</p>
-            <table className="mt-3 w-full text-sm">
+            <h2 className="px-5 pt-5 font-semibold text-terra max-lg:hidden">Custo de entrega por cliente</h2>
+            <p className="px-5 text-xs text-stone-500 max-lg:hidden">O custo de cada dia de entrega é dividido entre os clientes atendidos naquele dia.</p>
+            <Recolhe rotulo="Custo de entrega por cliente" className="max-lg:[&>button]:min-h-14 max-lg:[&>button]:px-5">
+            <table className="lista-cel mt-3 w-full text-sm">
               <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
                 <tr><th className="px-4 py-2">Cliente</th><th className="px-4 py-2 text-right">Entregas</th><th className="px-4 py-2 text-right">Custo</th><th className="px-4 py-2 text-right">Por caixa</th><th className="px-4 py-2 text-right" title="Custo da entrega ÷ venda pra esse cliente">Peso na venda</th></tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {c.porCliente.map((x) => (
                   <tr key={x.clienteId}>
-                    <td className="px-4 py-2.5"><Link href={`/painel/clientes/${x.clienteId}`} className="font-medium hover:underline">{x.nome}</Link><span className="block text-xs text-stone-500">{x.tipo}</span></td>
-                    <td className="tabular px-4 py-2.5 text-right">{num(x.entregas)}</td>
-                    <td className="tabular px-4 py-2.5 text-right font-semibold">{reais(x.custo)}</td>
-                    <td className="tabular px-4 py-2.5 text-right">{x.porCaixa !== null ? reais(x.porCaixa) : "—"}</td>
-                    <td className={`tabular px-4 py-2.5 text-right ${x.pesoNaVenda !== null && x.pesoNaVenda > 0.1 ? "font-semibold text-pimenta" : ""}`}>{x.pesoNaVenda !== null ? pct(x.pesoNaVenda) : "—"}</td>
+                    <td data-c="t" className="px-4 py-2.5"><Link href={`/painel/clientes/${x.clienteId}`} className="font-medium hover:underline">{x.nome}</Link><span className="block text-xs font-normal text-stone-500 max-lg:hidden">{x.tipo}</span><span className="tabular block text-sm font-normal text-stone-500 lg:hidden">{num(x.entregas)} {x.entregas === 1 ? "entrega" : "entregas"}{x.porCaixa !== null && ` · ${reais(x.porCaixa)}/cx`}{x.pesoNaVenda !== null && <span className={x.pesoNaVenda > 0.1 ? "font-semibold text-pimenta" : ""}> · {pct(x.pesoNaVenda)} da venda</span>}</span></td>
+                    <td data-c="x" className="tabular px-4 py-2.5 text-right">{num(x.entregas)}</td>
+                    <td data-c="v" className="tabular px-4 py-2.5 text-right font-semibold">{reais(x.custo)}</td>
+                    <td data-c="x" className="tabular px-4 py-2.5 text-right">{x.porCaixa !== null ? reais(x.porCaixa) : "—"}</td>
+                    <td data-c="x" className={`tabular px-4 py-2.5 text-right ${x.pesoNaVenda !== null && x.pesoNaVenda > 0.1 ? "font-semibold text-pimenta" : ""}`}>{x.pesoNaVenda !== null ? pct(x.pesoNaVenda) : "—"}</td>
                   </tr>
                 ))}
                 {c.porCliente.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-stone-500">Nenhuma entrega no período.</td></tr>}
               </tbody>
             </table>
+            </Recolhe>
           </section>
 
           {/* Por dia */}
           <section className="cartao overflow-x-auto">
-            <h2 className="px-5 pt-5 font-semibold text-terra">Dias de entrega</h2>
-            <table className="mt-3 w-full text-sm">
+            <h2 className="px-5 pt-5 font-semibold text-terra max-lg:hidden">Dias de entrega</h2>
+            <Recolhe rotulo="Dias de entrega" className="max-lg:[&>button]:min-h-14 max-lg:[&>button]:px-5">
+            <table className="lista-cel mt-3 w-full text-sm">
               <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
                 <tr><th className="px-4 py-2">Dia</th><th className="px-4 py-2 text-right">Entregas</th><th className="px-4 py-2 text-right">Km</th><th className="px-4 py-2 text-right">Combustível</th><th className="px-4 py-2 text-right">Manutenção</th><th className="px-4 py-2 text-right">Fixos</th><th className="px-4 py-2 text-right">Total</th></tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {c.porDia.map((d) => (
                   <tr key={d.dia}>
-                    <td className="px-4 py-2.5">{curto(d.dia)}{!d.temRota && d.paradas > 0 && <span className="ml-2 text-xs text-pimenta">sem rota</span>}{d.kmReal && <span className="ml-2 text-xs text-stone-500">km real</span>}</td>
-                    <td className="tabular px-4 py-2.5 text-right">{num(d.paradas)}</td>
-                    <td className="tabular px-4 py-2.5 text-right">{km(d.km)}</td>
-                    <td className="tabular px-4 py-2.5 text-right">{reais(d.combustivel)}</td>
-                    <td className="tabular px-4 py-2.5 text-right">{reais(d.manutencao)}</td>
-                    <td className="tabular px-4 py-2.5 text-right">{reais(d.fixos)}</td>
-                    <td className="tabular px-4 py-2.5 text-right font-semibold">{reais(d.total)}</td>
+                    <td data-c="t" className="px-4 py-2.5">{curto(d.dia)}{!d.temRota && d.paradas > 0 && <span className="ml-2 text-xs text-pimenta">sem rota</span>}{d.kmReal && <span className="ml-2 text-xs text-stone-500">km real</span>}</td>
+                    <td data-c="s" className="tabular px-4 py-2.5 text-right">{num(d.paradas)}<span className="lg:hidden"> entregas · {km(d.km)}</span></td>
+                    <td data-c="x" className="tabular px-4 py-2.5 text-right">{km(d.km)}</td>
+                    <td data-c="x" className="tabular px-4 py-2.5 text-right">{reais(d.combustivel)}</td>
+                    <td data-c="x" className="tabular px-4 py-2.5 text-right">{reais(d.manutencao)}</td>
+                    <td data-c="x" className="tabular px-4 py-2.5 text-right">{reais(d.fixos)}</td>
+                    <td data-c="v" className="tabular px-4 py-2.5 text-right font-semibold">{reais(d.total)}</td>
                   </tr>
                 ))}
                 {c.porDia.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-stone-500">Nenhuma entrega nem rota no período. O fixo do período ({reais(c.fixos)}) entra no fechamento mesmo assim.</td></tr>}
               </tbody>
             </table>
+            </Recolhe>
           </section>
 
-          <section className="cartao p-5">
-            <h2 className="mb-1 font-semibold text-terra">Dados e custos da {veiculo.apelido}</h2>
+          <section className="cartao p-5 max-lg:px-5 max-lg:py-1">
+            <Recolhe rotulo={`Dados e custos da ${veiculo.apelido}`}>
+            <h2 className="mb-1 font-semibold text-terra max-lg:hidden">Dados e custos da {veiculo.apelido}</h2>
             <p className="mb-4 text-xs text-stone-500">Valores iniciais são estimativa: troque pelos do boleto do IPVA, da apólice do seguro e da oficina.</p>
             <FormVeiculo v={veiculo} />
+            </Recolhe>
           </section>
         </div>
 
@@ -187,7 +194,7 @@ export default async function Veiculos({ searchParams }: PageProps<"/painel/veic
                     <span className="font-medium">{TIPOS_GASTO_VEICULO[g.tipo as TipoGastoVeiculo] ?? g.tipo}</span> <span className="tabular">{reais(g.valor)}</span>
                     <span className="block text-xs text-stone-500">{curto(g.dia)}{g.litros ? ` · ${num(g.litros)} L (${reais(g.valor / g.litros)}/L)` : ""}{g.km ? ` · ${num(g.km)} km` : ""}{g.descricao ? ` · ${g.descricao}` : ""}</span>
                   </span>
-                  <form action={excluirGasto.bind(null, g.id)}><button className="rounded p-1 text-stone-400 hover:text-red-600" aria-label="Apagar gasto"><Trash2 className="size-4" /></button></form>
+                  <form action={excluirGasto.bind(null, g.id)}><button className="toque rounded p-1 text-stone-400 hover:text-red-600" aria-label="Apagar gasto"><Trash2 className="size-4" /></button></form>
                 </li>
               ))}
               {c.gastos.lista.length === 0 && <li className="py-3 text-stone-500">Nenhum gasto lançado no período.</li>}

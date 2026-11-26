@@ -110,7 +110,7 @@ export function CampoData({
           validar(paraBR(novo), novo || null);
           emitir(novo);
         }}
-        className="pointer-events-none absolute right-0 bottom-0 h-0 w-0 opacity-0"
+        className="data-nativa pointer-events-none absolute right-0 bottom-0 h-0 w-0 opacity-0"
       />
       <button
         type="button"
@@ -124,7 +124,7 @@ export function CampoData({
             el.focus();
           }
         }}
-        className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-stone-500 hover:bg-stone-100 hover:text-marca-900"
+        className="data-botao absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-stone-500 hover:bg-stone-100 hover:text-marca-900"
       >
         <CalendarDays className="size-4" />
       </button>

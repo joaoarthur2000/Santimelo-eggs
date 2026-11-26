@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Check, ChevronDown, Copy, LoaderCircle, MapPin, MessageCircle } from "lucide-react";
+import { useFormulario } from "@/components/formulario";
 import { CIDADES, FORMAS_PAGAMENTO, PRAZOS_PAGAMENTO, TIPOS_NEGOCIO } from "@/lib/constantes";
 import { baseDoLogin } from "@/lib/login";
 import { cadastrarCliente, type Cadastro } from "../../actions";
@@ -48,7 +49,7 @@ function Pilulas({ nome, opcoes, inicial, colunas = "" }: { nome: string; opcoes
           key={o.valor}
           className="cursor-pointer rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 ring-1 ring-stone-200 transition hover:ring-marca-400 has-[:checked]:bg-marca-900 has-[:checked]:text-white has-[:checked]:ring-marca-900 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-marca-500"
         >
-          <input type="radio" name={nome} value={o.valor} defaultChecked={o.valor === inicial} required className="sr-only" />
+          <input type="radio" name={nome} value={o.valor} defaultChecked={o.valor === inicial} className="sr-only" />
           {o.rotulo}
         </label>
       ))}
@@ -59,7 +60,7 @@ function Pilulas({ nome, opcoes, inicial, colunas = "" }: { nome: string; opcoes
 const rotulo = "block text-sm font-medium text-stone-700";
 
 export function CadastroCliente({ regioes, linkApp }: { regioes: Regiao[]; linkApp: string }) {
-  const [estado, acao, enviando] = useActionState<Cadastro, FormData>(cadastrarCliente, {});
+  const { estado, enviando, ref: formulario, aoEnviar } = useFormulario<Cadastro & { ok?: number }>(cadastrarCliente, {});
   const [nome, setNome] = useState("");
   const [cep, setCep] = useState("");
   const [busca, setBusca] = useState<"" | "buscando" | "achou" | "naoachou">("");
@@ -93,7 +94,7 @@ export function CadastroCliente({ regioes, linkApp }: { regioes: Regiao[]; linkA
   const foraDaRegiao = endereco.cidade && !(CIDADES as readonly string[]).includes(endereco.cidade);
 
   return (
-    <form action={acao} className="space-y-5">
+    <form ref={formulario} onSubmit={aoEnviar} noValidate className="space-y-5">
       <Passo n={1} titulo="Quem é o cliente?" sub="O básico pra gente conhecer a casa.">
         <p className={rotulo}>Tipo de negócio</p>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -102,7 +103,7 @@ export function CadastroCliente({ regioes, linkApp }: { regioes: Regiao[]; linkA
               key={t}
               className="flex cursor-pointer flex-col items-center gap-1 rounded-2xl bg-white py-4 text-sm font-semibold text-stone-700 ring-1 ring-stone-200 transition hover:-translate-y-0.5 hover:ring-marca-400 has-[:checked]:bg-gema-100 has-[:checked]:text-casca-900 has-[:checked]:ring-2 has-[:checked]:ring-gema-500"
             >
-              <input type="radio" name="tipoNegocio" value={t} required className="sr-only" />
+              <input type="radio" name="tipoNegocio" value={t} className="sr-only" />
               <span className="text-3xl" aria-hidden>{ICONE_TIPO[t]}</span>
               {t}
             </label>
@@ -122,22 +123,21 @@ export function CadastroCliente({ regioes, linkApp }: { regioes: Regiao[]; linkA
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className={rotulo}>
             Quem faz os pedidos?
-            <input name="responsavel" required placeholder="Ex: Marina" className="campo mt-1" />
+            <input name="responsavel" placeholder="Ex: Marina" className="campo mt-1" />
           </label>
           <label className={rotulo}>
             WhatsApp
-            <input name="whatsapp" required inputMode="tel" value={fone} onChange={(e) => setFone(mascaraFone(e.target.value))} placeholder="(51) 99999-9999" className="campo mt-1" />
+            <input name="whatsapp" inputMode="tel" value={fone} onChange={(e) => setFone(mascaraFone(e.target.value))} placeholder="(51) 99999-9999" className="campo mt-1" />
           </label>
         </div>
       </Passo>
 
-      <Passo n={2} titulo="Onde a gente entrega?" sub="Coloca o CEP que o resto vem sozinho.">
+      <Passo n={2} titulo="Onde a gente entrega?" sub="Com o CEP o resto vem sozinho. Sem ele, preenche o que souber.">
         <div className="grid gap-3 sm:grid-cols-[180px_1fr] sm:items-end">
           <label className={rotulo}>
             CEP
             <input
               name="cep"
-              required
               inputMode="numeric"
               value={cep}
               onChange={(e) => {
@@ -157,15 +157,15 @@ export function CadastroCliente({ regioes, linkApp }: { regioes: Regiao[]; linkA
           </p>
         </div>
 
-        {(busca === "achou" || busca === "naoachou" || endereco.rua) && (
+        {/* sempre à mão: dá pra preencher sem o CEP */}
           <div className="mt-3 grid gap-3 sm:grid-cols-6">
             <label className={`${rotulo} sm:col-span-4`}>
               Rua
-              <input name="rua" required value={endereco.rua} onChange={(e) => setEndereco({ ...endereco, rua: e.target.value })} className="campo mt-1" />
+              <input name="rua" value={endereco.rua} onChange={(e) => setEndereco({ ...endereco, rua: e.target.value })} className="campo mt-1" />
             </label>
             <label className={`${rotulo} sm:col-span-1`}>
               Número
-              <input ref={numeroRef} name="numero" required inputMode="numeric" className="campo mt-1" />
+              <input ref={numeroRef} name="numero" inputMode="numeric" className="campo mt-1" />
             </label>
             <label className={`${rotulo} sm:col-span-1`}>
               Compl.
@@ -175,7 +175,6 @@ export function CadastroCliente({ regioes, linkApp }: { regioes: Regiao[]; linkA
               Bairro
               <input
                 name="bairro"
-                required
                 value={endereco.bairro}
                 onChange={(e) => {
                   setEndereco({ ...endereco, bairro: e.target.value });
@@ -186,7 +185,7 @@ export function CadastroCliente({ regioes, linkApp }: { regioes: Regiao[]; linkA
             </label>
             <label className={`${rotulo} sm:col-span-3`}>
               Cidade
-              <input name="cidade" required list="cidades" value={endereco.cidade} onChange={(e) => setEndereco({ ...endereco, cidade: e.target.value })} className="campo mt-1" />
+              <input name="cidade" list="cidades" value={endereco.cidade} onChange={(e) => setEndereco({ ...endereco, cidade: e.target.value })} className="campo mt-1" />
               <datalist id="cidades">
                 {CIDADES.map((c) => (
                   <option key={c} value={c} />
@@ -204,7 +203,6 @@ export function CadastroCliente({ regioes, linkApp }: { regioes: Regiao[]; linkA
               </select>
             </label>
           </div>
-        )}
       </Passo>
 
       <Passo n={3} titulo="Como ele paga?" sub="Três toques e pronto.">
@@ -297,6 +295,7 @@ function Sucesso({ estado, linkApp }: { estado: Cadastro; linkApp: string }) {
       <p className="mx-auto mt-2 max-w-md text-lg text-gema-200">
         <b className="text-gema-50">{estado.nome}</b> agora é cliente Santimelo. O Guinho já tá separando os ovos!
       </p>
+      {!!estado.falta?.length && <p className="mx-auto mt-2 max-w-md text-sm text-gema-200">Salvo. Ainda falta {estado.falta.join(", ")}: dá pra completar depois, na ficha.</p>}
 
       {estado.login ? (
         <div className="mx-auto mt-6 max-w-md rounded-2xl bg-white p-5 text-left text-stone-800">
@@ -322,7 +321,7 @@ function Sucesso({ estado, linkApp }: { estado: Cadastro; linkApp: string }) {
           )}
           <p className="mt-2 break-all text-xs text-stone-500">{linkApp}</p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {whats && (
+            {whats.length >= 10 && (
               <a href={`https://wa.me/55${whats}?text=${encodeURIComponent(mensagem)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-green-700">
                 <MessageCircle className="size-4" /> Mandar no WhatsApp
               </a>

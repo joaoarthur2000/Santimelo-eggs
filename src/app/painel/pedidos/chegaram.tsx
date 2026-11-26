@@ -66,9 +66,9 @@ export async function PedidosQueChegaram() {
                   </span>
                 </li>
               )}
-              <li className="flex items-center gap-2 pr-4 transition-colors duration-150 hover:bg-ouro/[0.07]">
-                <Link href={`/painel/pedidos/${p.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 py-3 pl-5 text-sm">
-                  <span className="tabular w-9 font-medium text-stone-400">#{p.id}</span>
+              <li className="flex items-center gap-2 transition-colors duration-150 hover:bg-ouro/[0.07] active:bg-ouro/10 lg:pr-4">
+                <Link href={`/painel/pedidos/${p.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 py-3 pl-5 text-sm max-lg:pr-5">
+                  <span className="tabular w-9 font-medium text-stone-400 max-lg:hidden">#{p.id}</span>
                   <span className="min-w-40 flex-1">
                     <b className="font-semibold text-marca-950">{p.cliente.nomeFantasia}</b>
                     <span className="block text-xs text-stone-500">
@@ -77,12 +77,12 @@ export async function PedidosQueChegaram() {
                   </span>
                   {p.janela && <span className="tabular text-stone-600">{p.janela.inicio}–{p.janela.fim}</span>}
                   <span className="tabular w-24 text-right font-semibold">{reais(p.total)}</span>
-                  <span className="w-44 text-right text-xs whitespace-nowrap text-stone-500">
+                  <span className="w-44 text-right text-xs whitespace-nowrap text-stone-500 max-lg:w-full max-lg:text-left">
                     {ORIGENS_PEDIDO[p.origem as keyof typeof ORIGENS_PEDIDO] ?? p.origem} · {p.quando}
                     {p.status === "NOVO" && <span className="ml-1.5 rounded-full bg-terra px-2 py-0.5 text-[11px] font-semibold text-ouro">novo</span>}
                   </span>
                 </Link>
-                <ExcluirPedido id={p.id} />
+                <span className="contents max-lg:[&>*]:hidden"><ExcluirPedido id={p.id} /></span>
               </li>
             </Fragment>
           );

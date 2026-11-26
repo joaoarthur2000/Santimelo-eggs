@@ -14,7 +14,7 @@ export default async function ClienteRapido() {
       <Link href="/painel/clientes" className="mb-3 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-marca-700">
         <ArrowLeft className="size-4" /> Clientes
       </Link>
-      <Cabecalho titulo="Cliente novo" subtitulo="Só o nome e a forma de pagamento são obrigatórios. Salvou, o formulário limpa pro próximo." />
+      <Cabecalho titulo="Cliente novo" explica subtitulo="Só o nome e a forma de pagamento são obrigatórios. Salvou, o formulário limpa pro próximo." />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section className="cartao max-w-xl p-5 sm:p-7">
           <FormClienteRapido />

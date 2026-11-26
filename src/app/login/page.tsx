@@ -1,16 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { redirect } from "next/navigation";
 import { Marca } from "@/components/marca";
+import { metadadosDoPainel, viewportDoPainel } from "@/lib/app-painel";
 import { usuarioAtual } from "@/lib/sessao";
 import { FormLogin } from "./form-login";
 
-export const metadata: Metadata = { title: "Entrar" };
+export const metadata: Metadata = { ...metadadosDoPainel, title: "Entrar" };
+export const viewport: Viewport = viewportDoPainel;
 
 export default async function Login() {
   if (await usuarioAtual()) redirect("/");
 
   return (
-    <main className="relative flex flex-1 items-center justify-center overflow-hidden bg-[#1f140e] px-4 py-12">
+    <main className="relative flex min-h-dvh flex-1 items-center justify-center overflow-hidden bg-[#1f140e] px-4 pt-[calc(env(safe-area-inset-top)+48px)] pb-[calc(env(safe-area-inset-bottom)+48px)]">
       {/* brilho dourado discreto atrás do cartão (estático, não pesa) */}
       <div className="pointer-events-none absolute -top-40 left-1/2 size-[640px] -translate-x-1/2 rounded-full bg-ouro/15 blur-3xl" aria-hidden />
       <div className="painel-entra relative w-full max-w-[380px]">

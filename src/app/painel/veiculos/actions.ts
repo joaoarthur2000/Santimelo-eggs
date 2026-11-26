@@ -5,9 +5,10 @@ import { z } from "zod";
 import { CONFIG, gravarConfig } from "@/lib/config";
 import { TIPOS_GASTO_VEICULO } from "@/lib/constantes";
 import { db } from "@/lib/db";
+import { errosDoForm } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 
-type Estado = { erro?: string; ok?: number };
+type Estado = { erro?: string; ok?: number; campos?: Record<string, string> };
 const texto = (v: FormDataEntryValue | null) => String(v ?? "").trim() || null;
 const num = (v: FormDataEntryValue | null) => {
   const t = String(v ?? "").trim();
@@ -45,7 +46,7 @@ export async function salvarVeiculo(id: string, _e: Estado, form: FormData): Pro
     manutencaoPorKm: num(form.get("manutencaoPorKm")) ?? 0,
     pneusPorKm: num(form.get("pneusPorKm")) ?? 0,
   });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   await db.veiculo.update({ where: { id }, data: r.data });
   // as Rotas usam o mesmo consumo e preço do litro
   await gravarConfig(CONFIG.ROTA_CONSUMO, String(r.data.consumoKmL));
@@ -75,7 +76,7 @@ export async function lancarGasto(_e: Estado, form: FormData): Promise<Estado> {
     km: num(form.get("km")),
     descricao: texto(form.get("descricao")),
   });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   const v = await db.veiculo.findUnique({ where: { id: r.data.veiculoId } });
   if (!v) return { erro: "Veículo não encontrado" };
   await db.gastoVeiculo.create({ data: { ...r.data, autor: usuario.nome } });

@@ -5,9 +5,10 @@ import { z } from "zod";
 import { diaISO, inicioDoDia } from "@/lib/datas";
 import { FORMAS_PAGAMENTO_FORNECEDOR } from "@/lib/constantes";
 import { db } from "@/lib/db";
+import { errosDoForm } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 
-export type Estado = { erro?: string; ok?: number };
+export type Estado = { erro?: string; ok?: number; campos?: Record<string, string> };
 const texto = (v: FormDataEntryValue | null) => String(v ?? "").trim() || null;
 
 const esquema = z.object({
@@ -19,7 +20,7 @@ const esquema = z.object({
 export async function cadastrarFornecedor(_e: Estado, form: FormData): Promise<Estado> {
   await exigirPapel("DIRETOR");
   const r = esquema.safeParse({ nome: texto(form.get("nome")) ?? "", contato: texto(form.get("contato")), produtos: texto(form.get("produtos")) });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   if (await db.fornecedor.findUnique({ where: { nome: r.data.nome } })) return { erro: "Já existe um fornecedor com esse nome" };
   const ordem = (await db.fornecedor.count()) + 1;
   await db.fornecedor.create({ data: { ...r.data, ordem } });
@@ -52,9 +53,8 @@ const esquemaCompra = z.object({
   custoUnit: z.number("Informe o valor da caixa").positive("Informe o valor da caixa").max(100000),
 });
 
-/** Compra de mercadoria lançada pela tela de Fornecedores: entra no estoque e no custo médio como qualquer compra. */
-export async function lancarCompra(_e: Estado, form: FormData): Promise<Estado> {
-  const usuario = await exigirPapel("DIRETOR");
+/** Confere os campos da compra e monta o que vai pro extrato */
+async function lerCompra(form: FormData) {
   const r = esquemaCompra.safeParse({
     fornecedorId: texto(form.get("fornecedorId")) ?? "",
     dia: texto(form.get("dia")) ?? "",
@@ -63,21 +63,37 @@ export async function lancarCompra(_e: Estado, form: FormData): Promise<Estado> 
     quantidade: numero(form.get("quantidade")),
     custoUnit: numero(form.get("custoUnit")),
   });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   const { dia, ...dados } = r.data;
   if (dia > diaISO()) return { erro: "A data não pode ser no futuro" };
   const fornecedor = await db.fornecedor.findUnique({ where: { id: dados.fornecedorId } });
   if (!fornecedor) return { erro: "Fornecedor não encontrado" };
-  await db.movimentoEstoque.create({
-    data: {
+  return {
+    dados: {
       ...dados,
       data: new Date(inicioDoDia(dia).getTime() + 12 * 60 * 60 * 1000), // meio-dia: não escorrega de dia por fuso
       fornecedor: fornecedor.nome, // nome também, como no Estoque
-      origem: "FORNECEDOR",
-      tipo: "COMPRA",
-      autor: usuario.nome,
     },
-  });
+  };
+}
+
+/** Compra de mercadoria lançada pela tela de Fornecedores ou do Dia a dia: entra no estoque e no custo médio como qualquer compra. */
+export async function lancarCompra(_e: Estado, form: FormData): Promise<Estado> {
+  const usuario = await exigirPapel("DIRETOR");
+  const c = await lerCompra(form);
+  if ("erro" in c) return c;
+  await db.movimentoEstoque.create({ data: { ...c.dados, origem: "FORNECEDOR", tipo: "COMPRA", autor: usuario.nome } });
+  revalidatePath("/painel", "layout");
+  return { ok: Date.now() };
+}
+
+/** Corrige uma compra já lançada. Estoque, custo médio e o "A pagar" do fornecedor saem do extrato, então acompanham */
+export async function editarCompra(id: string, _e: Estado, form: FormData): Promise<Estado> {
+  await exigirPapel("DIRETOR");
+  const c = await lerCompra(form);
+  if ("erro" in c) return c;
+  const { count } = await db.movimentoEstoque.updateMany({ where: { id, tipo: "COMPRA" }, data: c.dados });
+  if (!count) return { erro: "Essa compra não existe mais." };
   revalidatePath("/painel", "layout");
   return { ok: Date.now() };
 }
@@ -93,7 +109,7 @@ const esquemaPagamento = z.object({
 export async function registrarPagamento(fornecedorId: string, _e: Estado, form: FormData): Promise<Estado> {
   const usuario = await exigirPapel("DIRETOR");
   const r = esquemaPagamento.safeParse({ valor: numero(form.get("valor")), forma: texto(form.get("forma")) ?? "", dia: texto(form.get("dia")) ?? "", observacao: texto(form.get("observacao")) });
-  if (!r.success) return { erro: r.error.issues[0].message };
+  if (!r.success) return errosDoForm(r.error);
   if (r.data.dia > diaISO()) return { erro: "A data não pode ser no futuro" };
   if (!(await db.fornecedor.findUnique({ where: { id: fornecedorId } }))) return { erro: "Fornecedor não encontrado" };
   await db.pagamentoFornecedor.create({ data: { ...r.data, fornecedorId, autor: usuario.nome } });

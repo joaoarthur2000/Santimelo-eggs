@@ -1,11 +1,18 @@
+import type { Metadata, Viewport } from "next";
 import { LogOut } from "lucide-react";
 import { Marca } from "@/components/marca";
 import { exigirPapel } from "@/lib/sessao";
 import { sair } from "../login/actions";
+import { AbasCelular, TopoCelular } from "./barra-celular";
 import { NavPainel } from "./nav-painel";
 import { db } from "@/lib/db";
 import { contarChegaram } from "./pedidos/chegaram";
 import { diaISO } from "@/lib/datas";
+import { metadadosDoPainel, viewportDoPainel } from "@/lib/app-painel";
+
+// Instalável na tela inicial do celular
+export const metadata: Metadata = metadadosDoPainel;
+export const viewport: Viewport = viewportDoPainel;
 
 export default async function LayoutPainel({ children }: LayoutProps<"/painel">) {
   const usuario = await exigirPapel("DIRETOR");
@@ -21,19 +28,17 @@ export default async function LayoutPainel({ children }: LayoutProps<"/painel">)
     .map((p) => p[0]?.toUpperCase() ?? "")
     .join("");
 
+  const contadores = { "/painel/pedidos": novos, "/painel/atendimentos": atendimentos, "/painel/clientes": atrasados, "/painel/cobrancas": atrasados };
+
   return (
     <div className="painel flex min-h-screen flex-col lg:flex-row">
-      <aside className="flex shrink-0 flex-col border-white/5 bg-[linear-gradient(180deg,#2b1c15_0%,#1f140e_100%)] text-white print:hidden lg:sticky lg:top-0 lg:z-30 lg:h-screen lg:w-[248px] lg:border-r">
-        <div className="flex items-center justify-between px-5 py-4 lg:px-6 lg:pt-6 lg:pb-7">
+      {/* Computador: menu lateral. Celular: topo + barra de abas (barra-celular.tsx) */}
+      <aside className="hidden shrink-0 flex-col border-r border-white/5 bg-[linear-gradient(180deg,#2b1c15_0%,#1f140e_100%)] text-white lg:sticky lg:top-0 lg:z-30 lg:flex lg:h-screen lg:w-[248px] print:hidden">
+        <div className="px-6 pt-6 pb-7">
           <Marca claro />
-          <form action={sair} className="lg:hidden">
-            <button className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white">
-              <LogOut className="size-4" /> Sair
-            </button>
-          </form>
         </div>
-        <NavPainel contadores={{ "/painel/pedidos": novos, "/painel/atendimentos": atendimentos, "/painel/clientes": atrasados, "/painel/cobrancas": atrasados }} />
-        <div className="hidden items-center gap-3 border-t border-white/[0.06] px-4 py-4 lg:flex">
+        <NavPainel contadores={contadores} />
+        <div className="flex items-center gap-3 border-t border-white/[0.06] px-4 py-4">
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-ouro/90 text-xs font-bold text-terra" aria-hidden>
             {iniciais}
           </span>
@@ -45,7 +50,9 @@ export default async function LayoutPainel({ children }: LayoutProps<"/painel">)
           </form>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 lg:px-10 lg:py-9 print:p-0">{children}</main>
+      <TopoCelular />
+      <main className="min-w-0 flex-1 px-4 py-5 sm:px-8 lg:px-10 lg:py-9 print:p-0">{children}</main>
+      <AbasCelular contadores={contadores} nome={usuario.nome} sair={sair} />
     </div>
   );
 }

@@ -18,7 +18,7 @@ export default async function EntregasOvos() {
 
   return (
     <>
-      <Cabecalho titulo="Entregas" subtitulo="Regiões, dias e horários em que o caminhão passa. É o que o cliente vê na agenda do app e escolhe ao pedir." />
+      <Cabecalho titulo="Entregas" explica subtitulo="Regiões, dias e horários em que o caminhão passa. É o que o cliente vê na agenda do app e escolhe ao pedir." />
       <div className="grid gap-6 xl:grid-cols-[1fr_340px] [&>*]:min-w-0">
         <div className="space-y-6">
           {regioes.map((r, i) => (
@@ -29,10 +29,10 @@ export default async function EntregasOvos() {
               </div>
               <ul className="mb-4 flex flex-wrap gap-2 text-sm">
                 {r.janelas.map((j) => (
-                  <li key={j.id} className={`flex items-center gap-2 rounded-full py-1 pl-3 pr-1 ring-1 ${j.ativo ? "bg-marca-50 ring-marca-200" : "bg-stone-100 text-stone-400 ring-stone-200"}`}>
+                  <li key={j.id} className={`flex items-center gap-2 rounded-full py-1 pl-3 pr-1 ring-1 max-lg:w-full max-lg:justify-between max-lg:rounded-xl max-lg:py-0 ${j.ativo ? "bg-marca-50 ring-marca-200" : "bg-stone-100 text-stone-400 ring-stone-200"}`}>
                     {DIAS_SEMANA[j.diaSemana].slice(0, 3)} {j.inicio}–{j.fim} · {j.capacidade} vagas
                     <form action={alternarJanela.bind(null, j.id)}>
-                      <button className="rounded-full px-2 text-xs text-stone-500 hover:bg-white">{j.ativo ? "pausar" : "ativar"}</button>
+                      <button className="rounded-full px-2 text-xs text-stone-500 hover:bg-white max-lg:min-h-11 max-lg:px-3 max-lg:font-medium max-lg:text-marca-700">{j.ativo ? "pausar" : "ativar"}</button>
                     </form>
                   </li>
                 ))}

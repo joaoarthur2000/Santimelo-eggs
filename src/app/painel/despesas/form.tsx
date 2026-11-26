@@ -1,19 +1,15 @@
 "use client";
 
 import { CampoData } from "@/components/campo-data";
-import { useActionState, useEffect, useRef } from "react";
+import { useFormulario, type EstadoDoForm } from "@/components/formulario";
 import { CATEGORIAS_DESPESA, FORMAS_PAGAMENTO } from "@/lib/constantes";
 import { lancarDespesa } from "./actions";
 
 export function FormDespesa({ hoje }: { hoje: string }) {
-  const [estado, acao, enviando] = useActionState(lancarDespesa, {});
-  const ref = useRef<HTMLFormElement>(null);
-  useEffect(() => {
-    if (estado.ok) ref.current?.reset();
-  }, [estado.ok]);
+  const { estado, enviando, ref, aoEnviar } = useFormulario<EstadoDoForm>(lancarDespesa, {}, { limpar: true });
 
   return (
-    <form ref={ref} action={acao} className="space-y-3">
+    <form ref={ref} onSubmit={aoEnviar} className="space-y-3">
       <input name="descricao" required maxLength={120} placeholder="O que foi (ex: bandejas de papelão)" className="campo" />
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs text-stone-500">
@@ -36,7 +32,7 @@ export function FormDespesa({ hoje }: { hoje: string }) {
         </select>
       </div>
       <div className="flex items-center gap-3">
-        <button disabled={enviando} className="botao-primario">Lançar despesa</button>
+        <button disabled={enviando} className="botao-primario max-lg:flex-1">{enviando ? "Salvando…" : "Lançar despesa"}</button>
         {estado.erro && <p className="text-sm text-red-600">{estado.erro}</p>}
         {estado.ok && !estado.erro && <p className="text-sm text-marca-700">Lançada.</p>}
       </div>

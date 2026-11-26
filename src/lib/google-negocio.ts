@@ -222,11 +222,12 @@ type LugarGoogle = {
   types?: string[];
   primaryType?: string;
   location?: { latitude: number; longitude: number };
+  googleMapsUri?: string;
 };
 
-async function buscarNoPlaces(nome: string, lat: number | null, lng: number | null): Promise<LugarGoogle | null> {
+async function consultarPlaces(nome: string, lat: number | null, lng: number | null, quantos: number): Promise<{ erro: string } | { lugares: LugarGoogle[] }> {
   const chave = process.env.GOOGLE_PLACES_API_KEY;
-  if (!chave) return null;
+  if (!chave) return { erro: "Sem a chave do Google." };
   const centro = lat !== null && lng !== null ? { latitude: lat, longitude: lng } : { latitude: -30.0346, longitude: -51.2177 }; // centro de Porto Alegre
   try {
     const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
@@ -235,12 +236,13 @@ async function buscarNoPlaces(nome: string, lat: number | null, lng: number | nu
         "Content-Type": "application/json",
         "X-Goog-Api-Key": chave,
         "X-Goog-FieldMask":
-          "places.displayName,places.formattedAddress,places.addressComponents,places.nationalPhoneNumber,places.internationalPhoneNumber,places.types,places.primaryType,places.location",
+          "places.displayName,places.formattedAddress,places.addressComponents,places.nationalPhoneNumber,places.internationalPhoneNumber,places.types,places.primaryType,places.location,places.googleMapsUri",
       },
       body: JSON.stringify({
         textQuery: nome,
         languageCode: "pt-BR",
         regionCode: "BR",
+        pageSize: quantos,
         locationBias: { circle: { center: centro, radius: lat !== null ? 300 : 40000 } },
       }),
       cache: "no-store",
@@ -248,15 +250,20 @@ async function buscarNoPlaces(nome: string, lat: number | null, lng: number | nu
     });
     if (!r.ok) {
       console.error("Places API", r.status, (await r.text()).slice(0, 300));
-      return null;
+      return { erro: r.status === 429 ? "O Google pediu uma pausa. Espere um minuto e tente de novo." : `O Google recusou a busca (código ${r.status}). Confira a chave e se a Places API (New) está ativada.` };
     }
     const d = (await r.json()) as { places?: LugarGoogle[] };
-    const lugar = d.places?.[0];
-    return lugar?.displayName && nomesParecidos(lugar.displayName.text, nome) ? lugar : null;
+    return { lugares: d.places ?? [] };
   } catch (e) {
     console.error("Places API", e);
-    return null;
+    return { erro: "Não consegui falar com o Google agora." };
   }
+}
+
+async function buscarNoPlaces(nome: string, lat: number | null, lng: number | null): Promise<LugarGoogle | null> {
+  const r = await consultarPlaces(nome, lat, lng, 1);
+  const lugar = "lugares" in r ? r.lugares[0] : null;
+  return lugar?.displayName && nomesParecidos(lugar.displayName.text, nome) ? lugar : null;
 }
 
 function enderecoDoPlaces(l: LugarGoogle): Endereco {
@@ -407,4 +414,55 @@ export async function buscarNegocio(texto: string): Promise<{ erro: string } | {
   if (!dados.whatsapp) dados.faltou.push("telefone");
   if (!dados.tipoNegocio) dados.faltou.push("tipo de comércio");
   return { dados };
+}
+
+// ---------- busca pelo nome (completar cadastros) ----------
+
+/** `parecido`: o nome bate com o do cliente (dá pra já deixar escolhido) */
+export type OpcaoCadastro = DadosNegocio & { parecido: boolean };
+
+const CIDADE_NA_BUSCA = /porto alegre|\bpoa\b|canoas|cachoeirinha|gravata|alvorada|viam|esteio|sapucaia|leopoldo|hamburgo|gua[ií]ba|eldorado/i;
+
+/** Lugares com esse nome em Porto Alegre e região (até 3), pra escolher o certo */
+export async function buscarPorNome(termo: string, nomeDoCliente: string): Promise<{ erro: string } | { opcoes: OpcaoCadastro[] }> {
+  const nome = termo.trim().slice(0, 120);
+  if (process.env.GOOGLE_PLACES_API_KEY) {
+    const r = await consultarPlaces(CIDADE_NA_BUSCA.test(nome) ? nome : `${nome} Porto Alegre`, null, null, 3);
+    if ("erro" in r) return r;
+    return {
+      opcoes: r.lugares
+        .filter((l) => l.displayName)
+        .map((l) => ({
+          ...enderecoDoPlaces(l),
+          nome: l.displayName!.text,
+          tipoNegocio: tipoPeloNome(l.displayName!.text) ?? tipoPeloGoogle([l.primaryType ?? "", ...(l.types ?? [])]),
+          whatsapp: formatarTelefone(l.nationalPhoneNumber ?? l.internationalPhoneNumber),
+          lat: l.location?.latitude ?? null,
+          lng: l.location?.longitude ?? null,
+          link: l.googleMapsUri ?? "",
+          fontes: ["Google"],
+          faltou: [],
+          parecido: nomesParecidos(l.displayName!.text, nomeDoCliente),
+        })),
+    };
+  }
+  const semCidade = nome.replace(/[\s,-]+(porto alegre|poa)([\s,-]+rs)?$/i, "").trim();
+  const achados = (await nominatim(`search?format=jsonv2&addressdetails=1&extratags=1&limit=3&countrycodes=br&bounded=1&viewbox=-51.6,-29.6,-50.8,-30.4&q=${encodeURIComponent(semCidade)}`)) as LugarOsm[] | null;
+  if (!achados) return { erro: "Não consegui consultar o mapa agora. Tente de novo em instantes." };
+  return {
+    opcoes: achados
+      .filter((l) => l.name && nomesParecidos(l.name, semCidade)) // sem isso o mapa aberto devolve rua e bairro com o nome
+      .map((l) => ({
+        ...enderecoDoOsm(l.address),
+        nome: l.name!,
+        tipoNegocio: tipoPeloNome(l.name!) ?? tipoPeloOsm(l.category, l.type),
+        whatsapp: telefoneOsm(l.extratags),
+        lat: l.lat ? Number(l.lat) : null,
+        lng: l.lon ? Number(l.lon) : null,
+        link: "",
+        fontes: ["OpenStreetMap"],
+        faltou: [],
+        parecido: nomesParecidos(l.name!, nomeDoCliente),
+      })),
+  };
 }

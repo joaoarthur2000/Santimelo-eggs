@@ -1,9 +1,9 @@
-import { CampoData } from "@/components/campo-data";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, Minus } from "lucide-react";
-import { GraficoVendas } from "@/components/grafico-vendas";
-import { Cabecalho, Codigo, Vazio } from "@/components/ui";
+import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+import { GraficoVendas } from "@/components/graficos";
+import { Recolhe } from "@/components/recolhe";
+import { Cabecalho, Codigo, SeletorDia, Vazio } from "@/components/ui";
 import { PERIODOS, type Periodo } from "@/lib/constantes";
 import { COR_CUSTO, COR_LUCRO } from "@/lib/cores";
 import { diaISO, diaValido, formatarDia } from "@/lib/datas";
@@ -65,33 +65,26 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
   return (
     <>
       <Cabecalho titulo="Relatórios e fechamento" subtitulo={`${PERIODOS[periodo]} · ${r.titulo}`}>
-        <nav className="flex rounded-lg bg-white p-1 ring-1 ring-stone-200 print:hidden" aria-label="Período">
+        <nav className="flex rounded-lg bg-white p-1 ring-1 ring-stone-200 max-lg:w-full max-lg:rounded-xl print:hidden" aria-label="Período">
           {(Object.keys(PERIODOS) as Periodo[]).map((p) => (
-            <Link key={p} href={link(p, dia)} aria-current={p === periodo ? "page" : undefined} className={`rounded-md px-4 py-1.5 text-sm font-medium ${p === periodo ? "bg-marca-800 text-white" : "text-stone-600 hover:bg-stone-100"}`}>
+            <Link key={p} href={link(p, dia)} aria-current={p === periodo ? "page" : undefined} className={`rounded-md px-4 py-1.5 text-center text-sm font-medium max-lg:flex-1 max-lg:rounded-lg max-lg:py-2.5 ${p === periodo ? "bg-marca-800 text-white" : "text-stone-600 hover:bg-stone-100"}`}>
               {p === "dia" ? "Diário" : p === "semana" ? "Semanal" : "Mensal"}
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-1 print:hidden">
-          <Link href={link(periodo, r.anterior)} className="botao-secundario px-2" aria-label="Período anterior">
-            <ChevronLeft className="size-4" />
-          </Link>
-          <form action="/painel/relatorios" className="contents">
-            <input type="hidden" name="periodo" value={periodo} />
-            <CampoData name="dia" defaultValue={dia} className="campo w-auto" aria-label="Escolher data" />
-            <button className="botao-secundario">Ir</button>
-          </form>
-          <Link href={link(periodo, r.proximo)} className="botao-secundario px-2" aria-label="Próximo período">
-            <ChevronRight className="size-4" />
-          </Link>
+        <div className="flex items-center gap-1 max-lg:w-full max-lg:gap-2 print:hidden">
+          <SeletorDia dia={dia} rota="/painel/relatorios" extra={{ periodo }} anterior={r.anterior} proximo={r.proximo} rotulo={periodo === "dia" ? undefined : r.titulo} />
           {dia !== diaISO() && (
-            <Link href={link(periodo, diaISO())} className="botao-secundario">
+            <Link href={link(periodo, diaISO())} className="botao-secundario max-lg:px-3">
               Hoje
             </Link>
           )}
-          <BotaoImprimir />
+          {periodo === "dia" && <Link href={`/painel/dia?dia=${dia}`} className="botao-secundario max-lg:hidden">Ver e editar o dia</Link>}
+          <span className="max-lg:hidden"><BotaoImprimir /></span>
         </div>
       </Cabecalho>
+
+      {periodo === "dia" && <Link href={`/painel/dia?dia=${dia}`} className="botao-secundario mb-4 w-full lg:hidden">Ver e editar vendas e compras do dia</Link>}
 
       {/* Fechamento: da venda ao lucro que sobra, e o dinheiro que entrou */}
       <section className="mb-6 grid gap-4 rounded-2xl bg-marca-900 p-5 text-white lg:grid-cols-[1fr_1.3fr] [&>*]:min-w-0">
@@ -186,9 +179,9 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
         </p>
         <GraficoVendas dados={grafico} destaque={periodo === "dia" ? grafico.length - 1 : undefined} />
         <details className="mt-3 text-sm print:hidden">
-          <summary className="cursor-pointer text-marca-700 hover:underline">Ver os números dia a dia</summary>
+          <summary className="cursor-pointer text-marca-700 hover:underline max-lg:py-3">Ver os números dia a dia</summary>
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm max-lg:[&_td]:pr-2 max-lg:[&_th]:pr-2">
               <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
                 <tr>
                   <th className="py-2 pr-4">Dia</th>
@@ -200,7 +193,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
               <tbody className="divide-y divide-stone-100">
                 {r.porFaixa.map((f) => (
                   <tr key={f.faixa}>
-                    <td className="py-1.5 pr-4">{f.faixa}</td>
+                    <td className="py-1.5 pr-4"><Link href={`/painel/dia?dia=${f.dia}`} className="toque text-marca-700 hover:underline">{f.faixa}</Link></td>
                     <td className="tabular py-1.5 pr-4 text-right">{reais(f.faturamento)}</td>
                     <td className="tabular py-1.5 pr-4 text-right">{reais(f.custo)}</td>
                     <td className="tabular py-1.5 text-right font-semibold">{reais(f.lucro)}</td>
@@ -229,7 +222,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
 
         <div className="cartao overflow-x-auto">
           <h2 className="px-5 pt-5 font-semibold text-marca-950">Custo, faturamento e lucro de cada produto</h2>
-          <table className="mt-3 w-full text-sm">
+          <table className="lista-cel mt-3 w-full text-sm">
             <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
               <tr>
                 <th className="min-w-52 px-4 py-2">Produto</th>
@@ -245,7 +238,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
             <tbody className="divide-y divide-stone-100">
               {r.porProduto.map((p) => (
                 <tr key={p.nome}>
-                  <td className="px-4 py-2.5">
+                  <td data-c="t" className="px-4 py-2.5">
                     <span className="flex items-center gap-2">
                       <Codigo codigo={p.codigo} />
                       <span>
@@ -254,13 +247,13 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
                       </span>
                     </span>
                   </td>
-                  <td className="tabular px-4 py-2.5 text-right">{quantidade(p.quantidade, p.unidade)}</td>
-                  <td className="tabular px-4 py-2.5 text-right text-stone-600">{p.custoUnit !== null ? reais(p.custoUnit) : "—"}</td>
-                  <td className="tabular px-4 py-2.5 text-right">{reais(p.faturamento)}</td>
-                  <td className="tabular px-4 py-2.5 text-right">{reais(p.custo)}</td>
-                  <td className="tabular px-4 py-2.5 text-right font-semibold">{reais(p.lucro)}</td>
-                  <td className="tabular px-4 py-2.5 text-right text-stone-600">{p.markup !== null ? pct(p.markup) : "—"}</td>
-                  <td className="px-4 py-2.5">
+                  <td data-c="p" data-r="Vendido" className="tabular px-4 py-2.5 text-right">{quantidade(p.quantidade, p.unidade)}</td>
+                  <td data-c="p" data-r="Custo unitário" className="tabular px-4 py-2.5 text-right text-stone-600">{p.custoUnit !== null ? reais(p.custoUnit) : "—"}</td>
+                  <td data-c="p" data-r="Faturamento" className="tabular px-4 py-2.5 text-right">{reais(p.faturamento)}</td>
+                  <td data-c="p" data-r="Custo" className="tabular px-4 py-2.5 text-right">{reais(p.custo)}</td>
+                  <td data-c="v" className="tabular px-4 py-2.5 text-right font-semibold"><span className="block text-xs font-normal text-stone-500 lg:hidden">lucro</span>{reais(p.lucro)}</td>
+                  <td data-c="p" data-r="Markup" className="tabular px-4 py-2.5 text-right text-stone-600">{p.markup !== null ? pct(p.markup) : "—"}</td>
+                  <td data-c="p" data-r="Margem" className="px-4 py-2.5 max-lg:[&>span]:flex-1">
                     {p.margem !== null ? (
                       <span className="flex items-center gap-2">
                         <span className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: `${COR_CUSTO}33` }} aria-hidden>
@@ -283,14 +276,14 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
             {r.porProduto.length > 0 && (
               <tfoot className="border-t border-stone-200 font-semibold">
                 <tr>
-                  <td className="px-4 py-3">Total</td>
-                  <td className="tabular px-4 py-3 text-right">{cx(t.caixas)}</td>
-                  <td />
-                  <td className="tabular px-4 py-3 text-right">{reais(t.faturamento)}</td>
-                  <td className="tabular px-4 py-3 text-right">{reais(t.custo)}</td>
-                  <td className="tabular px-4 py-3 text-right">{reais(t.lucro)}</td>
-                  <td className="tabular px-4 py-3 text-right text-xs">{t.markup !== null ? pct(t.markup) : ""}</td>
-                  <td className="tabular px-4 py-3 text-xs">{t.margem !== null ? pct(t.margem) : ""}</td>
+                  <td data-c="t" className="px-4 py-3">Total</td>
+                  <td data-c="p" data-r="Caixas" className="tabular px-4 py-3 text-right">{cx(t.caixas)}</td>
+                  <td data-c="x" />
+                  <td data-c="p" data-r="Faturamento" className="tabular px-4 py-3 text-right">{reais(t.faturamento)}</td>
+                  <td data-c="p" data-r="Custo" className="tabular px-4 py-3 text-right">{reais(t.custo)}</td>
+                  <td data-c="v" className="tabular px-4 py-3 text-right">{reais(t.lucro)}</td>
+                  <td data-c="x" className="tabular px-4 py-3 text-right text-xs">{t.markup !== null ? pct(t.markup) : ""}</td>
+                  <td data-c="x" className="tabular px-4 py-3 text-xs">{t.margem !== null ? pct(t.margem) : ""}</td>
                 </tr>
               </tfoot>
             )}
@@ -364,10 +357,10 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
 
       <section className="mt-6 cartao overflow-x-auto">
         <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-5">
-          <h2 className="font-semibold text-marca-950">Logística: km e combustível da Fiorino</h2>
+          <h2 className="font-semibold text-marca-950">Logística<span className="max-lg:hidden">: km e combustível da Fiorino</span></h2>
           <Link href={`/painel/rotas?dia=${r.inicio}`} className="text-sm text-marca-700 hover:underline print:hidden">Abrir rotas →</Link>
         </div>
-        <table className="mt-3 w-full text-sm">
+        <table className="lista-cel mt-3 w-full text-sm">
           <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
             <tr>
               <th className="px-4 py-2">Dia</th>
@@ -382,16 +375,16 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
           <tbody className="divide-y divide-stone-100">
             {r.logistica.map((l) => (
               <tr key={l.dia}>
-                <td className="px-4 py-2.5 first-letter:uppercase">{formatarDia(l.dia, { weekday: "short", day: "2-digit", month: "2-digit" })}</td>
-                <td className="tabular px-4 py-2.5 text-right">{num(l.entregas)}</td>
-                <td className="tabular px-4 py-2.5 text-right">{cx(l.caixas)}</td>
-                <td className="tabular px-4 py-2.5 text-right">
+                <td data-c="t" className="px-4 py-2.5 first-letter:uppercase">{formatarDia(l.dia, { weekday: "short", day: "2-digit", month: "2-digit" })}</td>
+                <td data-c="s" className="tabular px-4 py-2.5 text-right">{num(l.entregas)}<span className="lg:hidden"> entregas · {cx(l.caixas)} · {km(l.km)}</span></td>
+                <td data-c="x" className="tabular px-4 py-2.5 text-right">{cx(l.caixas)}</td>
+                <td data-c="x" className="tabular px-4 py-2.5 text-right">
                   {km(l.km)}
                   {!l.real && <span className="text-xs text-stone-400"> calc.</span>}
                 </td>
-                <td className="tabular px-4 py-2.5 text-right">{litros(l.litros)}</td>
-                <td className="tabular px-4 py-2.5 text-right font-semibold">{reais(l.custo)}</td>
-                <td className="tabular px-4 py-2.5 text-right">{l.caixas ? reais(l.custo / l.caixas) : "—"}</td>
+                <td data-c="x" className="tabular px-4 py-2.5 text-right">{litros(l.litros)}</td>
+                <td data-c="v" className="tabular px-4 py-2.5 text-right font-semibold">{reais(l.custo)}</td>
+                <td data-c="x" className="tabular px-4 py-2.5 text-right">{l.caixas ? reais(l.custo / l.caixas) : "—"}</td>
               </tr>
             ))}
             {r.logistica.length === 0 && (
@@ -403,13 +396,13 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
           {r.logistica.length > 1 && (
             <tfoot className="border-t border-stone-200 font-semibold">
               <tr>
-                <td className="px-4 py-2.5">Total</td>
-                <td className="tabular px-4 py-2.5 text-right">{num(r.logistica.reduce((s, l) => s + l.entregas, 0))}</td>
-                <td className="tabular px-4 py-2.5 text-right">{cx(r.logistica.reduce((s, l) => s + l.caixas, 0))}</td>
-                <td className="tabular px-4 py-2.5 text-right">{km(f.km)}</td>
-                <td className="tabular px-4 py-2.5 text-right">{litros(f.litros)}</td>
-                <td className="tabular px-4 py-2.5 text-right">{reais(f.combustivel)}</td>
-                <td className="px-4 py-2.5" />
+                <td data-c="t" className="px-4 py-2.5">Total</td>
+                <td data-c="p" data-r="Entregas" className="tabular px-4 py-2.5 text-right">{num(r.logistica.reduce((s, l) => s + l.entregas, 0))}</td>
+                <td data-c="p" data-r="Caixas" className="tabular px-4 py-2.5 text-right">{cx(r.logistica.reduce((s, l) => s + l.caixas, 0))}</td>
+                <td data-c="p" data-r="Km" className="tabular px-4 py-2.5 text-right">{km(f.km)}</td>
+                <td data-c="p" data-r="Litros" className="tabular px-4 py-2.5 text-right">{litros(f.litros)}</td>
+                <td data-c="v" className="tabular px-4 py-2.5 text-right">{reais(f.combustivel)}</td>
+                <td data-c="x" className="px-4 py-2.5" />
               </tr>
             </tfoot>
           )}
@@ -418,8 +411,9 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
 
       <section className="mt-6 grid gap-6 xl:grid-cols-[3fr_2fr] [&>*]:min-w-0">
         <div className="cartao overflow-x-auto">
-          <h2 className="px-5 pt-5 font-semibold text-marca-950">Quem mais comprou</h2>
-          <table className="mt-3 w-full text-sm">
+          <h2 className="px-5 pt-5 font-semibold text-marca-950 max-lg:hidden">Quem mais comprou</h2>
+          <Recolhe rotulo="Quem mais comprou" className="max-lg:[&>button]:min-h-14 max-lg:[&>button]:px-5">
+          <table className="lista-cel mt-3 w-full text-sm">
             <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
               <tr>
                 <th className="px-4 py-2">Cliente</th>
@@ -433,15 +427,15 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
             <tbody className="divide-y divide-stone-100">
               {r.porCliente.map((c) => (
                 <tr key={c.nome}>
-                  <td className="px-4 py-2.5 font-medium">
+                  <td data-c="t" className="px-4 py-2.5 font-medium">
                     {c.nome}
                     <span className="block text-xs font-normal text-stone-500">{c.tipo} · {c.notaFiscal ? "com NF" : "sem NF"}</span>
                   </td>
-                  <td className="tabular px-4 py-2.5 text-right">{num(c.pedidos)}</td>
-                  <td className="tabular px-4 py-2.5 text-right">{cx(c.caixas)}</td>
-                  <td className="tabular px-4 py-2.5 text-right">{reais(c.faturamento)}</td>
-                  <td className="tabular px-4 py-2.5 text-right font-semibold">{reais(c.lucro)}</td>
-                  <td className="tabular px-4 py-2.5 text-right">{c.margem !== null ? pct(c.margem) : "—"}</td>
+                  <td data-c="x" className="tabular px-4 py-2.5 text-right">{num(c.pedidos)}</td>
+                  <td data-c="p" data-r={`${num(c.pedidos)} pedidos`} className="tabular px-4 py-2.5 text-right">{cx(c.caixas)}</td>
+                  <td data-c="v" className="tabular px-4 py-2.5 text-right">{reais(c.faturamento)}</td>
+                  <td data-c="p" data-r="Lucro" className="tabular px-4 py-2.5 text-right font-semibold">{reais(c.lucro)}</td>
+                  <td data-c="x" className="tabular px-4 py-2.5 text-right">{c.margem !== null ? pct(c.margem) : "—"}</td>
                 </tr>
               ))}
               {r.porCliente.length === 0 && (
@@ -451,6 +445,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
               )}
             </tbody>
           </table>
+          </Recolhe>
         </div>
         <div className="cartao p-5">
           <h2 className="font-semibold text-marca-950">Compras de ovos no período</h2>
@@ -483,7 +478,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
         <div className="cartao overflow-x-auto">
           <h2 className="px-5 pt-5 font-semibold text-marca-950">Compras por fornecedor</h2>
           <p className="px-5 text-xs text-stone-500">Quanto saiu pra cada fornecedor e o custo médio da caixa de cada um.</p>
-          <table className="mt-3 w-full text-sm">
+          <table className="lista-cel mt-3 w-full text-sm">
             <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
               <tr>
                 <th className="px-4 py-2">Fornecedor</th>
@@ -497,12 +492,12 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
             <tbody className="divide-y divide-stone-100">
               {r.fornecedores.map((fo) => (
                 <tr key={fo.nome}>
-                  <td className="px-4 py-2.5 font-medium">{fo.nome}</td>
-                  <td className="tabular px-4 py-2.5 text-right">{num(fo.compras)}</td>
-                  <td className="tabular px-4 py-2.5 text-right">{cx(fo.caixas)}{fo.pacotes > 0 && <span className="block text-xs text-stone-500">{num(fo.pacotes)} pct</span>}</td>
-                  <td className="tabular px-4 py-2.5 text-right">{fo.custoMedioCaixa !== null ? reais(fo.custoMedioCaixa) : "—"}</td>
-                  <td className="tabular px-4 py-2.5 text-right font-semibold">{reais(fo.valor)}</td>
-                  <td className="px-4 py-2.5">
+                  <td data-c="t" className="px-4 py-2.5 font-medium">{fo.nome}</td>
+                  <td data-c="x" className="tabular px-4 py-2.5 text-right">{num(fo.compras)}</td>
+                  <td data-c="p" data-r={`${num(fo.compras)} compras`} className="tabular px-4 py-2.5 text-right">{cx(fo.caixas)}{fo.pacotes > 0 && <span className="block text-xs text-stone-500">{num(fo.pacotes)} pct</span>}</td>
+                  <td data-c="p" data-r="Custo médio da caixa" className="tabular px-4 py-2.5 text-right">{fo.custoMedioCaixa !== null ? reais(fo.custoMedioCaixa) : "—"}</td>
+                  <td data-c="v" className="tabular px-4 py-2.5 text-right font-semibold">{reais(fo.valor)}</td>
+                  <td data-c="p" data-r="Participação" className="px-4 py-2.5 max-lg:[&>span]:flex-1">
                     <span className="flex items-center gap-2">
                       <span className="h-2 flex-1 overflow-hidden rounded-full bg-stone-200" aria-hidden>
                         <span className="block h-full rounded-full bg-marca-600" style={{ width: `${fo.participacao * 100}%` }} />
@@ -521,7 +516,7 @@ export default async function Relatorios({ searchParams }: PageProps<"/painel/re
         <div className="cartao p-5">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="font-semibold text-marca-950">Despesas da operação</h2>
-            <Link href="/painel/despesas" className="text-sm text-marca-700 hover:underline print:hidden">Lançar →</Link>
+            <Link href="/painel/despesas#lancar" className="toque text-sm text-marca-700 hover:underline print:hidden">Lançar →</Link>
           </div>
           <p className="mt-1 text-xs text-stone-500">Fora mercadoria e combustível (o combustível vem das Rotas).</p>
           <p className="tabular mt-4 text-3xl font-bold text-marca-950">{reais(r.despesas.total)}</p>

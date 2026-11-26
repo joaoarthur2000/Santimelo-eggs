@@ -33,7 +33,7 @@ function Janela({ refDialogo, titulo, subtitulo, children }: { refDialogo: React
             <h2 className="text-lg font-semibold tracking-tight text-marca-950">{titulo}</h2>
             {subtitulo && <p className="mt-0.5 text-sm text-stone-500">{subtitulo}</p>}
           </div>
-          <button type="button" onClick={() => refDialogo.current?.close()} aria-label="Fechar" className="grid size-8 shrink-0 place-items-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700">
+          <button type="button" onClick={() => refDialogo.current?.close()} aria-label="Fechar" className="toque grid size-8 shrink-0 place-items-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700">
             <X className="size-4" />
           </button>
         </div>
@@ -95,7 +95,7 @@ export function EditarEstoque({
           setContado(fmt(Math.max(0, saldo)));
           ref.current?.showModal();
         }}
-        className="botao-secundario h-9 px-3"
+        className="botao-secundario h-9 px-3 max-lg:h-auto"
       >
         <PencilLine className="size-4" /> Editar
       </button>
@@ -107,7 +107,7 @@ export function EditarEstoque({
               key={id}
               type="button"
               onClick={() => setModo(id)}
-              className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 font-medium transition-[background-color,color,box-shadow] duration-150 ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 font-medium max-lg:py-3 transition-[background-color,color,box-shadow] duration-150 ${
                 modo === id ? "bg-white text-marca-950 shadow-[0_1px_2px_rgb(41_28_18/0.12)]" : "text-stone-500 hover:text-marca-950"
               }`}
             >
@@ -138,7 +138,7 @@ export function EditarEstoque({
                     key={m}
                     type="button"
                     onClick={() => setMotivo(m)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition-colors duration-150 ${
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 max-lg:min-h-11 max-lg:px-4 ring-inset transition-colors duration-150 ${
                       motivo === m ? "bg-marca-900 text-white ring-marca-900" : "bg-white text-stone-600 ring-stone-200 hover:ring-stone-300"
                     }`}
                   >

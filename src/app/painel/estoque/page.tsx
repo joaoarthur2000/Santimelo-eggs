@@ -24,21 +24,21 @@ export default async function Estoque({ searchParams }: PageProps<"/painel/estoq
 
   return (
     <>
-      <Cabecalho titulo="Estoque" subtitulo="Em caixas de 360 ovos. Compra entra em Lançar entrada; a venda sai quando o pedido é marcado Entregue.">
+      <Cabecalho titulo="Estoque" explica acoesNoCelular={false} subtitulo="Em caixas de 360 ovos. Compra entra em Lançar entrada; a venda sai quando o pedido é marcado Entregue.">
         <ZerarTudo desativado={!temSaldo} />
       </Cabecalho>
 
-      <nav className="sem-rolagem mb-6 flex max-w-full gap-6 overflow-x-auto border-b border-stone-200" aria-label="Abas do estoque">
+      <nav className="sem-rolagem mb-5 flex max-w-full gap-6 overflow-x-auto max-lg:gap-0 lg:mb-6 border-b border-stone-200" aria-label="Abas do estoque">
         {ABAS.map(({ id, rotulo, icone: Icone }) => (
           <Link
             key={id}
             href={id === "atual" ? "/painel/estoque" : `/painel/estoque?aba=${id}`}
             aria-current={aba === id ? "page" : undefined}
-            className={`-mb-px flex items-center gap-2 border-b-2 px-0.5 pb-3 text-sm whitespace-nowrap transition-colors duration-150 ${
+            className={`-mb-px flex items-center gap-2 border-b-2 px-0.5 pb-3 text-sm max-lg:flex-1 max-lg:justify-center max-lg:pt-3 whitespace-nowrap transition-colors duration-150 ${
               aba === id ? "border-marca-900 font-semibold text-marca-950" : "border-transparent text-stone-500 hover:border-stone-300 hover:text-marca-950"
             }`}
           >
-            <Icone className="size-4" strokeWidth={1.75} /> {rotulo}
+            <Icone className="size-4 max-lg:hidden" strokeWidth={1.75} /> {rotulo}
           </Link>
         ))}
       </nav>

@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { networkInterfaces } from "node:os";
+import { hostname, networkInterfaces } from "node:os";
 
 // Celular no mesmo Wi-Fi (http://<IP do PC>:3001): em `next dev` o Next bloqueia o JavaScript pra
 // outros endereços, e aí nenhum botão funciona. Libera os IPs da rede local deste PC (o IP muda).
@@ -9,7 +9,7 @@ const ipsDaRede = Object.values(networkInterfaces())
   .map((i) => i!.address);
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ipsDaRede,
+  allowedDevOrigins: [...ipsDaRede, `${hostname().toLowerCase()}.local`],
   // Sistema interno atrás de login, com dados ao vivo: tudo renderiza por requisição.
   // Por isso Cache Components / Partial Prefetching ficam desligados.
   // Navegação instantânea: telas já abertas/pré-carregadas são reaproveitadas por alguns segundos
